@@ -60,3 +60,10 @@ mcts:
 experiment:
   name: exp_sampler_path
   description: MCTS samples contiguous return paths from dates in the same regime.
+  hypothesis: Path sampling preserves short-horizon return structure and improves
+    MCTS decisions.
+  changed_variable: mcts.sampler
+  baseline_experiment: benchmark_v1
+  expected_result: Sharpe or CAGR improves versus exp_sampler_daily.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better and beats daily sampler
+    on Sharpe.

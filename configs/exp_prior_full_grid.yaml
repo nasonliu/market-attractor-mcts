@@ -1,6 +1,11 @@
 experiment:
   name: exp_prior_full_grid
   description: SPY-only MCTS evaluates the full action grid, ignoring prior-band restriction.
+  hypothesis: Full action grid improves decision quality by removing prior-induced action censorship.
+  changed_variable: mcts.use_full_action_grid
+  baseline_experiment: benchmark_v1
+  expected_result: Sharpe or CAGR improves without unacceptable drawdown deterioration.
+  success_criteria: SPY MCTS gate is PASS or improves Sharpe delta versus benchmark_v1.
 
 mcts:
   sampler: "path"

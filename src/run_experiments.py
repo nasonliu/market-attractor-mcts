@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -59,14 +61,30 @@ def main() -> None:
         )
 
         metrics = result["metrics"].copy()
+        metadata = _experiment_metadata(config, experiment_name)
         comparisons = _build_comparisons(metrics)
-        gate = _acceptance_gate(comparisons)
+        gates = _build_gates(comparisons)
+        contract_review = _strategy_contract_review(result["prices"], result["strategy_weights"])
+        leakage_review = _leakage_review()
+        review = _build_review(
+            metadata,
+            gates,
+            comparisons,
+            leakage_review,
+            contract_review,
+        )
+        with (experiment_dir / "review.json").open("w", encoding="utf-8") as f:
+            json.dump(review, f, indent=2)
+
         metrics.insert(0, "experiment", experiment_name)
-        metrics["acceptance_gate"] = gate
+        for key, value in metadata.items():
+            metrics[key] = value
+        for key, value in gates.items():
+            metrics[key] = value
         for key, value in comparisons.items():
             metrics[key] = value
         all_rows.append(metrics)
-        experiment_summaries.append({"experiment": experiment_name, "acceptance_gate": gate, **comparisons})
+        experiment_summaries.append({**metadata, **gates, **comparisons})
 
         args.force_download = False
 
@@ -98,34 +116,80 @@ def _metric_row(metrics: pd.DataFrame, strategy: str) -> pd.Series:
     return rows.iloc[0]
 
 
+def _experiment_metadata(config: dict[str, Any], experiment_name: str) -> dict[str, str]:
+    experiment = config.get("experiment", {})
+    return {
+        "experiment": experiment_name,
+        "hypothesis": str(experiment.get("hypothesis", "")),
+        "changed_variable": str(experiment.get("changed_variable", "")),
+        "baseline_experiment": str(experiment.get("baseline_experiment", "")),
+        "expected_result": str(experiment.get("expected_result", "")),
+        "success_criteria": str(experiment.get("success_criteria", "")),
+    }
+
+
 def _build_comparisons(metrics: pd.DataFrame) -> dict[str, float]:
-    mcts = _metric_row(metrics, "Market Attractor MCTS")
+    spy_mcts = _metric_row(metrics, "Market Attractor MCTS")
+    multi_mcts = _metric_row(metrics, "Market Attractor MCTS MultiAsset")
     buy_hold = _metric_row(metrics, "Buy & Hold")
     spy_cash = _metric_row(metrics, "Regime Rule SPY/Cash")
     regime_rule_multi = _metric_row(metrics, "Regime Rule")
 
     comparisons: dict[str, float] = {}
-    for label, benchmark in (
-        ("buy_hold", buy_hold),
-        ("regime_rule_spy_cash", spy_cash),
-        ("regime_rule_multiasset", regime_rule_multi),
+    for prefix, strategy_row, benchmarks in (
+        (
+            "spy_mcts",
+            spy_mcts,
+            (
+                ("buy_hold", buy_hold),
+                ("regime_rule_spy_cash", spy_cash),
+                ("regime_rule_multiasset", regime_rule_multi),
+            ),
+        ),
+        (
+            "multi_asset_mcts",
+            multi_mcts,
+            (
+                ("buy_hold", buy_hold),
+                ("regime_rule_spy_cash", spy_cash),
+                ("regime_rule_multiasset", regime_rule_multi),
+            ),
+        ),
     ):
-        comparisons[f"mcts_cagr_delta_vs_{label}"] = float(mcts["cagr"] - benchmark["cagr"])
-        comparisons[f"mcts_sharpe_delta_vs_{label}"] = float(mcts["sharpe"] - benchmark["sharpe"])
-        comparisons[f"mcts_max_drawdown_delta_vs_{label}"] = float(
-            mcts["max_drawdown"] - benchmark["max_drawdown"]
-        )
-        comparisons[f"mcts_turnover_delta_vs_{label}"] = float(
-            mcts["avg_daily_turnover"] - benchmark["avg_daily_turnover"]
-        )
+        for label, benchmark in benchmarks:
+            comparisons.update(_delta_metrics(prefix, label, strategy_row, benchmark))
+
     return comparisons
 
 
-def _acceptance_gate(comparisons: dict[str, float]) -> str:
-    cagr = comparisons["mcts_cagr_delta_vs_regime_rule_spy_cash"]
-    sharpe = comparisons["mcts_sharpe_delta_vs_regime_rule_spy_cash"]
-    max_dd = comparisons["mcts_max_drawdown_delta_vs_regime_rule_spy_cash"]
-    turnover = comparisons["mcts_turnover_delta_vs_regime_rule_spy_cash"]
+def _delta_metrics(prefix: str, label: str, strategy: pd.Series, benchmark: pd.Series) -> dict[str, float]:
+    return {
+        f"{prefix}_cagr_delta_vs_{label}": float(strategy["cagr"] - benchmark["cagr"]),
+        f"{prefix}_sharpe_delta_vs_{label}": float(strategy["sharpe"] - benchmark["sharpe"]),
+        f"{prefix}_max_drawdown_delta_vs_{label}": float(
+            strategy["max_drawdown"] - benchmark["max_drawdown"]
+        ),
+        f"{prefix}_turnover_delta_vs_{label}": float(
+            strategy["avg_daily_turnover"] - benchmark["avg_daily_turnover"]
+        ),
+    }
+
+
+def _build_gates(comparisons: dict[str, float]) -> dict[str, str]:
+    spy_gate = _acceptance_gate(comparisons, "spy_mcts", "regime_rule_spy_cash")
+    multi_gate = _acceptance_gate(comparisons, "multi_asset_mcts", "regime_rule_multiasset")
+    return {
+        "spy_mcts_gate": spy_gate,
+        "multi_asset_mcts_gate": multi_gate,
+        "overall_gate": _overall_gate(spy_gate, multi_gate),
+    }
+
+
+def _acceptance_gate(comparisons: dict[str, float], prefix: str, benchmark: str) -> str:
+    cagr = comparisons[f"{prefix}_cagr_delta_vs_{benchmark}"]
+    sharpe = comparisons[f"{prefix}_sharpe_delta_vs_{benchmark}"]
+    max_dd = comparisons[f"{prefix}_max_drawdown_delta_vs_{benchmark}"]
+    turnover = comparisons[f"{prefix}_turnover_delta_vs_{benchmark}"]
 
     if cagr >= 0 and sharpe >= 0 and max_dd >= 0 and turnover <= 0:
         return "PASS"
@@ -134,24 +198,141 @@ def _acceptance_gate(comparisons: dict[str, float]) -> str:
     return "FAIL"
 
 
-def _write_report(path: Path, results_summary: pd.DataFrame, comparison_summary: pd.DataFrame) -> None:
-    mcts_rows = results_summary.loc[results_summary["strategy"] == "Market Attractor MCTS"].copy()
-    mcts_rows = mcts_rows.sort_values(
-        ["acceptance_gate", "mcts_sharpe_delta_vs_regime_rule_spy_cash", "cagr"],
-        ascending=[True, False, False],
-    )
+def _overall_gate(spy_gate: str, multi_gate: str) -> str:
+    if spy_gate == "PASS" and multi_gate == "PASS":
+        return "PASS"
+    if spy_gate in {"PASS", "WEAK PASS"} and multi_gate in {"PASS", "WEAK PASS"}:
+        return "WEAK PASS"
+    return "FAIL"
 
-    gate_counts = comparison_summary["acceptance_gate"].value_counts().to_frame("count")
+
+def _leakage_review() -> dict[str, Any]:
+    return {
+        "leakage_level": "exploratory_full_sample",
+        "known_lookahead_sources": [
+            "full-sample regime fit",
+            "full-sample future-return regime ranking",
+            "full-sample MCTS path sampling",
+        ],
+        "blocks_run": False,
+    }
+
+
+def _strategy_contract_review(
+    prices: pd.DataFrame,
+    strategy_weights: dict[str, pd.DataFrame],
+) -> dict[str, Any]:
+    strategy_results = {}
+    overall_pass = True
+    for strategy, weights in strategy_weights.items():
+        aligned_index = weights.index.equals(prices.index)
+        has_nan = bool(weights.isna().any().any())
+        gross_exposure = weights.abs().sum(axis=1)
+        max_abs_weight_sum = float(gross_exposure.max())
+        leverage_ok = bool((gross_exposure <= 1.0001).all())
+        abnormal_leverage = bool(max_abs_weight_sum > 1.0001)
+        turnover = weights.diff().abs().sum(axis=1)
+        turnover_calculable = bool(np.isfinite(turnover.fillna(0.0).to_numpy()).all())
+        passed = aligned_index and not has_nan and leverage_ok and turnover_calculable and not abnormal_leverage
+        overall_pass = overall_pass and passed
+        strategy_results[strategy] = {
+            "passed": passed,
+            "has_nan": has_nan,
+            "index_aligned_with_prices": bool(aligned_index),
+            "max_abs_weight_sum": max_abs_weight_sum,
+            "weight_abs_sum_lte_1_0001": leverage_ok,
+            "turnover_calculable": turnover_calculable,
+            "abnormal_leverage": abnormal_leverage,
+        }
+    return {"passed": overall_pass, "strategies": strategy_results}
+
+
+def _build_review(
+    metadata: dict[str, str],
+    gates: dict[str, str],
+    comparisons: dict[str, float],
+    leakage_review: dict[str, Any],
+    contract_review: dict[str, Any],
+) -> dict[str, Any]:
+    best_worst = _best_worst_metric_deltas(comparisons)
+    return {
+        "experiment": metadata["experiment"],
+        "hypothesis": metadata["hypothesis"],
+        "changed_variable": metadata["changed_variable"],
+        "baseline_experiment": metadata["baseline_experiment"],
+        "expected_result": metadata["expected_result"],
+        "success_criteria": metadata["success_criteria"],
+        "gate_results": gates,
+        **best_worst,
+        "leakage_level": leakage_review["leakage_level"],
+        "leakage_review": leakage_review,
+        "strategy_contract_review": contract_review,
+        "recommendation": _recommendation(gates, contract_review),
+    }
+
+
+def _recommendation(gates: dict[str, str], contract_review: dict[str, Any]) -> str:
+    if not contract_review["passed"]:
+        return "Fix strategy contract violations before interpreting performance."
+    if gates["overall_gate"] == "PASS":
+        return "Promote this configuration to the next benchmark candidate."
+    if gates["spy_mcts_gate"] in {"PASS", "WEAK PASS"} and gates["multi_asset_mcts_gate"] == "FAIL":
+        return "Keep SPY-only setting for comparison; improve or constrain multi-asset MCTS before relying on it."
+    if gates["spy_mcts_gate"] == "FAIL":
+        return "Do not promote; investigate SPY-only MCTS underperformance versus SPY/Cash benchmark."
+    return "Retain as exploratory comparison, not as a benchmark default."
+
+
+def _best_worst_metric_deltas(comparisons: dict[str, float]) -> dict[str, dict[str, float | str]]:
+    deltas = {key: value for key, value in comparisons.items() if "_delta_vs_" in key}
+    best_key = max(deltas, key=deltas.get)
+    worst_key = min(deltas, key=deltas.get)
+    return {
+        "best_metric_delta": {"metric": best_key, "value": deltas[best_key]},
+        "worst_metric_delta": {"metric": worst_key, "value": deltas[worst_key]},
+    }
+
+
+def _write_report(path: Path, results_summary: pd.DataFrame, comparison_summary: pd.DataFrame) -> None:
+    spy_rows = results_summary.loc[results_summary["strategy"] == "Market Attractor MCTS"].copy()
+    multi_rows = results_summary.loc[results_summary["strategy"] == "Market Attractor MCTS MultiAsset"].copy()
+    gate_counts = comparison_summary["overall_gate"].value_counts().to_frame("count")
+    best_by_sharpe = results_summary.sort_values("sharpe", ascending=False).head(10)
+    best_by_calmar = results_summary.sort_values("calmar", ascending=False).head(10)
+    best_by_max_drawdown = results_summary.sort_values("max_drawdown", ascending=False).head(10)
+    lowest_turnover = results_summary.sort_values("avg_daily_turnover").head(10)
+    best_spy = _sort_by_gate(
+        spy_rows,
+        "spy_mcts_gate",
+        "spy_mcts_sharpe_delta_vs_regime_rule_spy_cash",
+    ).head(5)
+    best_multi = _sort_by_gate(
+        multi_rows,
+        "multi_asset_mcts_gate",
+        "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
+    ).head(5)
+    next_experiments = _next_recommended_experiments(comparison_summary)
+    leakage = _leakage_review()
     lines = [
         "# Experiment Matrix Report",
         "",
         "This is a full-sample exploratory benchmark. It is intentionally not walk-forward yet.",
         "",
+        "## Leakage Review",
+        "",
+        f"- Leakage level: `{leakage['leakage_level']}`",
+        "- Known look-ahead sources:",
+        *[f"  - {source}" for source in leakage["known_lookahead_sources"]],
+        "- This does not block the current exploratory benchmark run.",
+        "",
         "## Acceptance Gate",
         "",
-        "- `PASS`: MCTS beats Regime Rule SPY/Cash on CAGR, Sharpe, max drawdown, and turnover.",
-        "- `WEAK PASS`: MCTS is close to Regime Rule SPY/Cash on CAGR/Sharpe/drawdown.",
-        "- `FAIL`: MCTS is not close enough to the SPY-only regime benchmark.",
+        "- `spy_mcts_gate`: SPY-only MCTS versus Regime Rule SPY/Cash.",
+        "- `multi_asset_mcts_gate`: MultiAsset MCTS versus Regime Rule.",
+        "- `overall_gate`: combined result across both MCTS variants.",
+        "- `PASS`: beats the relevant benchmark on CAGR, Sharpe, max drawdown, and turnover.",
+        "- `WEAK PASS`: close to the relevant benchmark on CAGR, Sharpe, and drawdown.",
+        "- `FAIL`: not close enough to the relevant benchmark.",
         "",
         "## Gate Counts",
         "",
@@ -165,33 +346,128 @@ def _write_report(path: Path, results_summary: pd.DataFrame, comparison_summary:
         comparison_summary.to_string(index=False),
         "```",
         "",
-        "## MCTS Strategy Rows",
+        "## Best by Sharpe",
         "",
         "```text",
-        mcts_rows[
+        _leaderboard(best_by_sharpe),
+        "```",
+        "",
+        "## Best by Calmar",
+        "",
+        "```text",
+        _leaderboard(best_by_calmar),
+        "```",
+        "",
+        "## Best by Max Drawdown",
+        "",
+        "```text",
+        _leaderboard(best_by_max_drawdown),
+        "```",
+        "",
+        "## Lowest Turnover",
+        "",
+        "```text",
+        _leaderboard(lowest_turnover),
+        "```",
+        "",
+        "## Best SPY-only MCTS Experiment",
+        "",
+        "```text",
+        best_spy[
             [
                 "experiment",
-                "acceptance_gate",
+                "spy_mcts_gate",
                 "total_return",
                 "cagr",
                 "sharpe",
                 "max_drawdown",
                 "avg_daily_turnover",
-                "mcts_cagr_delta_vs_regime_rule_spy_cash",
-                "mcts_sharpe_delta_vs_regime_rule_spy_cash",
-                "mcts_max_drawdown_delta_vs_regime_rule_spy_cash",
-                "mcts_turnover_delta_vs_regime_rule_spy_cash",
+                "spy_mcts_cagr_delta_vs_regime_rule_spy_cash",
+                "spy_mcts_sharpe_delta_vs_regime_rule_spy_cash",
+                "spy_mcts_max_drawdown_delta_vs_regime_rule_spy_cash",
+                "spy_mcts_turnover_delta_vs_regime_rule_spy_cash",
             ]
         ].to_string(index=False),
         "```",
         "",
+        "## Best MultiAsset MCTS Experiment",
+        "",
+        "```text",
+        best_multi[
+            [
+                "experiment",
+                "multi_asset_mcts_gate",
+                "total_return",
+                "cagr",
+                "sharpe",
+                "max_drawdown",
+                "avg_daily_turnover",
+                "multi_asset_mcts_cagr_delta_vs_regime_rule_multiasset",
+                "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
+                "multi_asset_mcts_max_drawdown_delta_vs_regime_rule_multiasset",
+                "multi_asset_mcts_turnover_delta_vs_regime_rule_multiasset",
+            ]
+        ].to_string(index=False),
+        "```",
+        "",
+        "## Next Recommended Experiments",
+        "",
+        *[f"- {item}" for item in next_experiments],
+        "",
         "## Required Artifacts",
         "",
         "Each experiment directory contains `config_snapshot.yaml`, `metrics.csv`, `equity_curve.csv`, "
-        "`drawdown.csv`, `strategy_diagnostics.csv`, and `mcts_root_values.csv`.",
+        "`drawdown.csv`, `strategy_diagnostics.csv`, `mcts_root_values.csv`, and `review.json`.",
         "",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _leaderboard(rows: pd.DataFrame) -> str:
+    return rows[
+        [
+            "experiment",
+            "strategy",
+            "overall_gate",
+            "total_return",
+            "cagr",
+            "sharpe",
+            "calmar",
+            "max_drawdown",
+            "avg_daily_turnover",
+        ]
+    ].to_string(index=False)
+
+
+def _sort_by_gate(rows: pd.DataFrame, gate_col: str, score_col: str) -> pd.DataFrame:
+    gate_rank = {"PASS": 0, "WEAK PASS": 1, "FAIL": 2}
+    sortable = rows.copy()
+    sortable["_gate_rank"] = sortable[gate_col].map(gate_rank).fillna(99)
+    return sortable.sort_values(["_gate_rank", score_col, "cagr"], ascending=[True, False, False])
+
+
+def _next_recommended_experiments(comparison_summary: pd.DataFrame) -> list[str]:
+    recommendations = []
+    best_spy = comparison_summary.sort_values(
+        "spy_mcts_sharpe_delta_vs_regime_rule_spy_cash",
+        ascending=False,
+    ).iloc[0]
+    recommendations.append(
+        "Promote or retest the strongest SPY-only candidate: "
+        f"{best_spy['experiment']} ({best_spy['spy_mcts_gate']})."
+    )
+    best_multi = comparison_summary.sort_values(
+        "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
+        ascending=False,
+    ).iloc[0]
+    recommendations.append(
+        "Use multi-asset results as diagnostics until a candidate improves versus Regime Rule: "
+        f"current best is {best_multi['experiment']} ({best_multi['multi_asset_mcts_gate']})."
+    )
+    if (comparison_summary["overall_gate"] == "FAIL").any():
+        recommendations.append("Investigate FAIL experiments before expanding the matrix.")
+    recommendations.append("Keep walk-forward validation out of this benchmark until full-sample experiments stabilize.")
+    return recommendations
 
 
 if __name__ == "__main__":

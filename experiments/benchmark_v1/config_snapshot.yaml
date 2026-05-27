@@ -60,3 +60,9 @@ mcts:
 experiment:
   name: benchmark_v1
   description: Current exploratory full-sample benchmark defaults.
+  hypothesis: Baseline settings provide the reference for all exploratory full-sample
+    experiments.
+  changed_variable: none
+  baseline_experiment: benchmark_v1
+  expected_result: Establish stable benchmark metrics and diagnostic artifacts.
+  success_criteria: MCTS is at least a WEAK PASS versus Regime Rule SPY/Cash.

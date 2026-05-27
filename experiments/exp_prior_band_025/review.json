@@ -1,0 +1,100 @@
+{
+  "experiment": "exp_prior_band_025",
+  "hypothesis": "A tighter prior band reduces turnover but may over-constrain SPY allocation.",
+  "changed_variable": "mcts.prior_band",
+  "baseline_experiment": "benchmark_v1",
+  "expected_result": "Turnover decreases relative to benchmark_v1 with limited Sharpe loss.",
+  "success_criteria": "SPY MCTS turnover delta improves while gate remains WEAK PASS or better.",
+  "gate_results": {
+    "spy_mcts_gate": "WEAK PASS",
+    "multi_asset_mcts_gate": "FAIL",
+    "overall_gate": "FAIL"
+  },
+  "best_metric_delta": {
+    "metric": "multi_asset_mcts_turnover_delta_vs_buy_hold",
+    "value": 0.757153249272551
+  },
+  "worst_metric_delta": {
+    "metric": "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
+    "value": -0.3057835093770179
+  },
+  "leakage_level": "exploratory_full_sample",
+  "leakage_review": {
+    "leakage_level": "exploratory_full_sample",
+    "known_lookahead_sources": [
+      "full-sample regime fit",
+      "full-sample future-return regime ranking",
+      "full-sample MCTS path sampling"
+    ],
+    "blocks_run": false
+  },
+  "strategy_contract_review": {
+    "passed": true,
+    "strategies": {
+      "Buy & Hold": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "MA200 Trend": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Vol Target": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Regime Rule": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Regime Rule SPY/Cash": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Market Attractor MCTS": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Market Attractor MCTS MultiAsset": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      }
+    }
+  },
+  "recommendation": "Keep SPY-only setting for comparison; improve or constrain multi-asset MCTS before relying on it."
+}

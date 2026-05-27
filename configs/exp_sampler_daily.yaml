@@ -1,6 +1,11 @@
 experiment:
   name: exp_sampler_daily
   description: MCTS samples independent one-day returns by regime.
+  hypothesis: Independent daily sampling underperforms path sampling because it loses serial structure.
+  changed_variable: mcts.sampler
+  baseline_experiment: benchmark_v1
+  expected_result: Lower Sharpe or CAGR than path sampling.
+  success_criteria: Used as a negative/control comparison; no PASS required.
 
 mcts:
   sampler: "regime_daily"

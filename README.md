@@ -112,6 +112,7 @@ experiments/
     drawdown.csv
     strategy_diagnostics.csv
     mcts_root_values.csv
+    review.json
 ```
 
 The report assigns an acceptance gate for each experiment:

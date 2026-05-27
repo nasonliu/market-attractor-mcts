@@ -1,6 +1,11 @@
 experiment:
   name: exp_prior_band_050
   description: Prior-restricted action grid with prior band 50 percentage points.
+  hypothesis: A wider prior band allows enough exploration while still preserving prior guidance.
+  changed_variable: mcts.prior_band
+  baseline_experiment: benchmark_v1
+  expected_result: Similar or better MCTS Sharpe versus benchmark_v1.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better.
 
 mcts:
   sampler: "path"

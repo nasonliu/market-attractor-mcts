@@ -1,6 +1,11 @@
 experiment:
   name: exp_prior_band_025
   description: Prior-restricted action grid with prior band 25 percentage points.
+  hypothesis: A tighter prior band reduces turnover but may over-constrain SPY allocation.
+  changed_variable: mcts.prior_band
+  baseline_experiment: benchmark_v1
+  expected_result: Turnover decreases relative to benchmark_v1 with limited Sharpe loss.
+  success_criteria: SPY MCTS turnover delta improves while gate remains WEAK PASS or better.
 
 mcts:
   sampler: "path"

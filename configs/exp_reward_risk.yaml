@@ -1,6 +1,11 @@
 experiment:
   name: exp_reward_risk
   description: Reward includes reduced drawdown penalty and opportunity cost.
+  hypothesis: Light risk and opportunity penalties improve risk-adjusted returns versus simple reward.
+  changed_variable: mcts.drawdown_penalty and mcts.opportunity_cost_weight
+  baseline_experiment: benchmark_v1
+  expected_result: Sharpe and max drawdown improve versus exp_reward_simple.
+  success_criteria: SPY MCTS Sharpe delta versus Regime Rule SPY/Cash is positive.
 
 mcts:
   sampler: "path"

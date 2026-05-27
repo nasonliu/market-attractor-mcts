@@ -60,3 +60,10 @@ mcts:
 experiment:
   name: exp_reward_simple
   description: Reward is return minus transaction cost only.
+  hypothesis: Removing risk and opportunity penalties reveals whether reward penalties
+    caused conservatism.
+  changed_variable: mcts.drawdown_penalty and mcts.opportunity_cost_weight
+  baseline_experiment: benchmark_v1
+  expected_result: CAGR improves, possibly with worse drawdown.
+  success_criteria: SPY MCTS CAGR delta versus Regime Rule SPY/Cash improves without
+    FAIL gate.

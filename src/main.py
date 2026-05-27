@@ -203,11 +203,13 @@ def run_pipeline(
     )
 
     return {
+        "prices": prices,
         "metrics": metrics,
         "equity_curves": equity_curves,
         "drawdowns": drawdowns,
         "strategy_diagnostics": strategy_diagnostics,
         "mcts_root_values": root_values,
+        "strategy_weights": strategy_weights,
     }
 
 
