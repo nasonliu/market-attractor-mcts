@@ -1,16 +1,16 @@
 {
-  "experiment": "benchmark_v1",
-  "hypothesis": "Baseline settings provide the reference for all exploratory full-sample experiments.",
-  "changed_variable": "none",
+  "experiment": "exp_prior_band_100",
+  "hypothesis": "Prior band has an upper range that can free SPY-only MCTS from the Regime Rule prior without the noisier full action grid behavior.",
+  "changed_variable": "mcts.prior_band",
   "baseline_experiment": "benchmark_v1",
-  "expected_result": "Establish stable benchmark metrics and diagnostic artifacts.",
-  "success_criteria": "MCTS is at least a WEAK PASS versus Regime Rule SPY/Cash.",
-  "hypothesis_supported": "inconclusive",
-  "decision": "KEEP_EXPLORATORY",
+  "expected_result": "SPY-only MCTS improves Sharpe or Calmar versus benchmark_v1 while turnover remains controlled.",
+  "success_criteria": "SPY MCTS gate remains WEAK PASS or better and Calmar does not deteriorate versus benchmark_v1.",
+  "hypothesis_supported": false,
+  "decision": "REJECT",
   "primary_failure_mode": "multi_asset_turnover_too_high",
   "next_recommended_experiment": "Test MultiAsset template persistence or turnover damping in a single-variable experiment.",
   "gate_results": {
-    "spy_mcts_gate": "WEAK PASS",
+    "spy_mcts_gate": "FAIL",
     "multi_asset_mcts_gate": "FAIL",
     "overall_gate": "FAIL"
   },
@@ -19,8 +19,8 @@
     "value": 0.7570320077594569
   },
   "worst_metric_delta": {
-    "metric": "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
-    "value": -0.3090261671090452
+    "metric": "spy_mcts_sharpe_delta_vs_regime_rule_multiasset",
+    "value": -0.3418081715349668
   },
   "leakage_level": "exploratory_full_sample",
   "leakage_review": {
@@ -100,5 +100,5 @@
       }
     }
   },
-  "recommendation": "Keep SPY-only setting for comparison; improve or constrain multi-asset MCTS before relying on it."
+  "recommendation": "Do not promote; investigate SPY-only MCTS underperformance versus SPY/Cash benchmark."
 }

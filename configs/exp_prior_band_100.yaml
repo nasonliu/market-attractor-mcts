@@ -1,0 +1,13 @@
+experiment:
+  name: exp_prior_band_100
+  description: Prior-restricted action grid with prior band 100 percentage points.
+  hypothesis: Prior band has an upper range that can free SPY-only MCTS from the Regime Rule prior without the noisier full action grid behavior.
+  changed_variable: mcts.prior_band
+  baseline_experiment: benchmark_v1
+  expected_result: SPY-only MCTS improves Sharpe or Calmar versus benchmark_v1 while turnover remains controlled.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better and Calmar does not deteriorate versus benchmark_v1.
+
+mcts:
+  sampler: "path"
+  use_full_action_grid: false
+  prior_band: 1.0

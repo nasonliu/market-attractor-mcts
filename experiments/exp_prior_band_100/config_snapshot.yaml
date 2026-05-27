@@ -1,0 +1,70 @@
+project:
+  name: market-attractor-mcts
+  seed: 42
+data:
+  tickers:
+  - SPY
+  - QQQ
+  - IWM
+  - TLT
+  - GLD
+  - ^VIX
+  start_date: '2010-01-01'
+  end_date: null
+features:
+  volatility_windows:
+  - 20
+  - 60
+  ma_windows:
+  - 50
+  - 200
+  relative_strength_windows:
+  - 20
+  - 60
+  vix_z_window: 60
+regime:
+  n_regimes: 4
+  kmeans_n_init: 20
+  hmm_covariance_type: diag
+  hmm_n_iter: 500
+backtest:
+  initial_capital: 1.0
+  trading_days: 252
+  transaction_cost_bps: 2.0
+  vol_target_annual: 0.1
+  max_leverage: 1.0
+  ma_window: 200
+  regime_rule_safe_assets:
+  - TLT
+  - GLD
+mcts:
+  asset: SPY
+  positions:
+  - 0.0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  horizon: 5
+  simulations_per_day: 100
+  exploration_constant: 1.41421356237
+  sampler: path
+  use_full_action_grid: false
+  prior_band: 1.0
+  drawdown_penalty: 0.1
+  opportunity_cost_weight: 0.2
+  action_inertia_threshold: 0.0005
+  multi_asset_hold_rollout_prob: 0.95
+  multi_asset_action_inertia_threshold: 0.001
+  transaction_cost_bps: 2.0
+experiment:
+  name: exp_prior_band_100
+  description: Prior-restricted action grid with prior band 100 percentage points.
+  hypothesis: Prior band has an upper range that can free SPY-only MCTS from the Regime
+    Rule prior without the noisier full action grid behavior.
+  changed_variable: mcts.prior_band
+  baseline_experiment: benchmark_v1
+  expected_result: SPY-only MCTS improves Sharpe or Calmar versus benchmark_v1 while
+    turnover remains controlled.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better and Calmar does not
+    deteriorate versus benchmark_v1.
