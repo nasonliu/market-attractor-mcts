@@ -71,6 +71,8 @@ def write_diagnostics_markdown(
     mcts_regime_stats: pd.DataFrame,
     mcts_config: dict,
     root_values: pd.DataFrame,
+    multi_asset_templates: pd.DataFrame | None = None,
+    multi_asset_root_values: pd.DataFrame | None = None,
 ) -> None:
     root_rows = []
     for level in POSITION_LEVELS:
@@ -94,6 +96,33 @@ def write_diagnostics_markdown(
         if bool(mcts_config.get("use_full_action_grid", False))
         else f"prior-restricted grid with prior_band={mcts_config.get('prior_band')}"
     )
+    multi_asset_summary = "No multi-asset template diagnostics were supplied."
+    multi_asset_root_summary = "No multi-asset root diagnostics were supplied."
+    if multi_asset_templates is not None and not multi_asset_templates.empty:
+        template_counts = (
+            multi_asset_templates["template_name"]
+            .value_counts(normalize=True)
+            .rename("template_share")
+            .to_frame()
+        )
+        transition_rate = float(multi_asset_templates["template_id"].diff().fillna(0).ne(0).mean())
+        multi_asset_summary = (
+            f"Daily template transition rate: {transition_rate:.2%}\n\n"
+            f"{template_counts.to_string()}"
+        )
+    if multi_asset_root_values is not None and not multi_asset_root_values.empty:
+        rows = []
+        template_value_cols = [col for col in multi_asset_root_values.columns if col.startswith("value_template_")]
+        for col in template_value_cols:
+            suffix = col.replace("value_template_", "")
+            rows.append(
+                {
+                    "template": int(suffix),
+                    "avg_root_value": multi_asset_root_values[col].mean(),
+                    "avg_visits": multi_asset_root_values[f"visits_template_{suffix}"].mean(),
+                }
+            )
+        multi_asset_root_summary = pd.DataFrame(rows).to_string(index=False)
 
     content = f"""# MCTS Diagnostics
 
@@ -123,6 +152,9 @@ The root-child selection now explicitly uses average value (`child.value / child
 - Added `Regime Rule SPY/Cash` to compare SPY-only timing against SPY-only MCTS.
 - Added `Market Attractor MCTS MultiAsset`, which chooses among five discrete SPY/TLT/GLD/cash templates.
 - Added `mcts_root_values.csv` to inspect the root action values and visits each day.
+- Widened `prior_band` and always includes the previous SPY position plus `50%` in the candidate set, so the search is no longer only a binary perturbation of the prior.
+- Added a small configurable action-inertia threshold to avoid switching when the estimated root-value edge is tiny.
+- MultiAsset rollout now heavily favors holding the current template, and MultiAsset emits template path/root-value diagnostics.
 
 ## Prior-restricted versus full-grid MCTS
 
@@ -160,6 +192,18 @@ Chosen SPY-only MCTS action shares:
 
 ```text
 {mcts_regime_stats.to_string(index=False)}
+```
+
+## MultiAsset template diagnostics
+
+```text
+{multi_asset_summary}
+```
+
+MultiAsset root values:
+
+```text
+{multi_asset_root_summary}
 ```
 """
     path.write_text(content, encoding="utf-8")

@@ -55,6 +55,7 @@ class MarketAttractorMCTS:
         use_full_action_grid: bool = False,
         prior_band: float = 0.25,
         opportunity_cost_weight: float = 0.2,
+        action_inertia_threshold: float = 0.0,
     ) -> None:
         self.positions = positions
         self.horizon = horizon
@@ -66,6 +67,7 @@ class MarketAttractorMCTS:
         self.use_full_action_grid = use_full_action_grid
         self.prior_band = prior_band
         self.opportunity_cost_weight = opportunity_cost_weight
+        self.action_inertia_threshold = action_inertia_threshold
         self.rng = np.random.default_rng(seed)
         self.transition_matrix: np.ndarray | None = None
         self.regime_returns: dict[int, np.ndarray] = {}
@@ -124,37 +126,8 @@ class MarketAttractorMCTS:
         previous_position: float,
         prior_position: float | None = None,
     ) -> float:
-        root = Node(regime=int(current_regime), depth=0, previous_position=previous_position)
-        actions = self._candidate_actions(prior_position)
-        for _ in range(self.simulations_per_day):
-            path = [root]
-            node = root
-            reward_so_far = 0.0
-            sampled_path = self._sample_return_path(root.regime)
-
-            while node.depth < self.horizon and len(node.children) == len(actions):
-                node = self._select_child(node)
-                path.append(node)
-                reward_so_far += node.reward_from_parent
-
-            if node.depth < self.horizon:
-                untried = [position for position in actions if position not in node.children]
-                action = float(self.rng.choice(untried))
-                next_node, step_reward = self._advance(node, action, sampled_path)
-                node.children[action] = next_node
-                node = next_node
-                path.append(node)
-                reward = reward_so_far + step_reward + self._rollout(node, actions, sampled_path)
-            else:
-                reward = reward_so_far
-
-            for visited in path:
-                visited.visits += 1
-                visited.value += reward
-
-        if not root.children:
-            return previous_position
-        return max(root.children.items(), key=lambda item: item[1].average_value)[0]
+        position, _ = self._search_root(current_regime, previous_position, prior_position)
+        return position
 
     def choose_position_with_diagnostics(
         self,
@@ -182,7 +155,7 @@ class MarketAttractorMCTS:
         prior_position: float | None = None,
     ) -> tuple[float, Node]:
         root = Node(regime=int(current_regime), depth=0, previous_position=previous_position)
-        actions = self._candidate_actions(prior_position)
+        actions = self._candidate_actions(prior_position, previous_position)
         for _ in range(self.simulations_per_day):
             path = [root]
             node = root
@@ -211,7 +184,7 @@ class MarketAttractorMCTS:
 
         if not root.children:
             return previous_position, root
-        return max(root.children.items(), key=lambda item: item[1].average_value)[0], root
+        return self._choose_root_action(root, previous_position), root
 
     def _select_child(self, node: Node) -> Node:
         log_parent = np.log(max(node.visits, 1))
@@ -299,17 +272,36 @@ class MarketAttractorMCTS:
             return None
         return paths[int(self.rng.integers(0, len(paths)))]
 
-    def _candidate_actions(self, prior_position: float | None) -> list[float]:
+    def _candidate_actions(
+        self,
+        prior_position: float | None,
+        previous_position: float | None = None,
+    ) -> list[float]:
         if self.use_full_action_grid or prior_position is None:
-            return self.positions
-        lower = prior_position - self.prior_band
-        upper = prior_position + self.prior_band
-        actions = [position for position in self.positions if lower <= position <= upper]
-        return actions or self.positions
+            actions = set(self.positions)
+        else:
+            lower = prior_position - self.prior_band
+            upper = prior_position + self.prior_band
+            actions = {position for position in self.positions if lower <= position <= upper}
+        if previous_position is not None:
+            actions.add(float(previous_position))
+        if 0.5 in self.positions:
+            actions.add(0.5)
+        return sorted(actions) or self.positions
 
     def _opportunity_cost(self, regime: int, position: float) -> float:
         next_20d = max(0.0, float(self.regime_next_20d.get(regime, 0.0)))
         return (1.0 - position) * next_20d * self.opportunity_cost_weight / 20.0
+
+    def _choose_root_action(self, root: Node, previous_position: float) -> float:
+        best_action, best_child = max(root.children.items(), key=lambda item: item[1].average_value)
+        previous_child = root.children.get(float(previous_position))
+        if previous_child is None or previous_child.visits == 0:
+            return best_action
+        value_edge = best_child.average_value - previous_child.average_value
+        if value_edge <= self.action_inertia_threshold:
+            return float(previous_position)
+        return best_action
 
 
 def build_mcts_weights(
@@ -333,6 +325,7 @@ def build_mcts_weights(
         use_full_action_grid=bool(mcts_config.get("use_full_action_grid", False)),
         prior_band=float(mcts_config.get("prior_band", 0.25)),
         opportunity_cost_weight=float(mcts_config.get("opportunity_cost_weight", 0.2)),
+        action_inertia_threshold=float(mcts_config.get("action_inertia_threshold", 0.0)),
     )
 
     spy_returns = prices[mcts_config["asset"]].pct_change(fill_method=None)
@@ -383,6 +376,8 @@ class MarketAttractorMultiAssetMCTS:
         drawdown_penalty: float,
         transaction_cost_bps: float,
         seed: int,
+        hold_rollout_prob: float = 0.8,
+        action_inertia_threshold: float = 0.0,
     ) -> None:
         self.templates = templates
         self.actions = list(range(len(templates)))
@@ -391,6 +386,8 @@ class MarketAttractorMultiAssetMCTS:
         self.exploration_constant = exploration_constant
         self.drawdown_penalty = drawdown_penalty
         self.transaction_cost = transaction_cost_bps / 10_000.0
+        self.hold_rollout_prob = hold_rollout_prob
+        self.action_inertia_threshold = action_inertia_threshold
         self.rng = np.random.default_rng(seed)
         self.assets = sorted({asset for template in templates for asset in template})
         self.regime_paths: dict[int, np.ndarray] = {}
@@ -421,6 +418,27 @@ class MarketAttractorMultiAssetMCTS:
                 )
 
     def choose_template(self, current_regime: int, previous_template: int) -> int:
+        template_id, _ = self._search_root(current_regime, previous_template)
+        return template_id
+
+    def choose_template_with_diagnostics(
+        self,
+        current_regime: int,
+        previous_template: int,
+    ) -> tuple[int, dict[str, float | int]]:
+        template_id, root = self._search_root(current_regime, previous_template)
+        row: dict[str, float | int] = {
+            "regime": int(current_regime),
+            "previous_template": int(previous_template),
+            "chosen_template": int(template_id),
+        }
+        for action in self.actions:
+            child = root.children.get(action)
+            row[f"value_template_{action}"] = np.nan if child is None or child.visits == 0 else child.average_value
+            row[f"visits_template_{action}"] = 0 if child is None else int(child.visits)
+        return template_id, row
+
+    def _search_root(self, current_regime: int, previous_template: int) -> tuple[int, TemplateNode]:
         root = TemplateNode(
             regime=int(current_regime),
             depth=0,
@@ -453,8 +471,8 @@ class MarketAttractorMultiAssetMCTS:
                 visited.value += reward
 
         if not root.children:
-            return previous_template
-        return max(root.children.items(), key=lambda item: item[1].average_value)[0]
+            return previous_template, root
+        return self._choose_root_action(root, previous_template), root
 
     def _select_child(self, node: TemplateNode) -> TemplateNode:
         log_parent = np.log(max(node.visits, 1))
@@ -498,7 +516,10 @@ class MarketAttractorMultiAssetMCTS:
         total_reward = 0.0
         rollout_node = node
         while rollout_node.depth < self.horizon:
-            action = int(self.rng.choice(self.actions))
+            if self.rng.random() < self.hold_rollout_prob:
+                action = rollout_node.previous_template
+            else:
+                action = int(self.rng.choice(self.actions))
             rollout_node, reward = self._advance(rollout_node, action, sampled_path)
             total_reward += reward
         return total_reward
@@ -518,6 +539,16 @@ class MarketAttractorMultiAssetMCTS:
         template = self.templates[action]
         return np.array([template.get(asset, 0.0) for asset in self.assets], dtype=float)
 
+    def _choose_root_action(self, root: TemplateNode, previous_template: int) -> int:
+        best_action, best_child = max(root.children.items(), key=lambda item: item[1].average_value)
+        previous_child = root.children.get(int(previous_template))
+        if previous_child is None or previous_child.visits == 0:
+            return int(best_action)
+        value_edge = best_child.average_value - previous_child.average_value
+        if value_edge <= self.action_inertia_threshold:
+            return int(previous_template)
+        return int(best_action)
+
 
 def default_multi_asset_templates() -> list[dict[str, float]]:
     return [
@@ -534,6 +565,8 @@ def build_multi_asset_mcts_weights(
     regimes: pd.DataFrame,
     config: dict,
     method: str = "hmm_regime",
+    template_path: str | Path | None = None,
+    root_values_path: str | Path | None = None,
 ) -> pd.DataFrame:
     mcts_config = config["mcts"]
     templates = default_multi_asset_templates()
@@ -545,6 +578,8 @@ def build_multi_asset_mcts_weights(
         drawdown_penalty=float(mcts_config.get("drawdown_penalty", 0.1)),
         transaction_cost_bps=float(mcts_config["transaction_cost_bps"]),
         seed=int(config["project"]["seed"]) + 17,
+        hold_rollout_prob=float(mcts_config.get("multi_asset_hold_rollout_prob", 0.8)),
+        action_inertia_threshold=float(mcts_config.get("multi_asset_action_inertia_threshold", 0.0)),
     )
 
     labels = regimes[method].reindex(prices.index).ffill()
@@ -553,10 +588,44 @@ def build_multi_asset_mcts_weights(
 
     weights = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
     previous_template = len(templates) - 1
+    template_rows = []
+    root_value_rows = []
     for date, regime in labels.dropna().items():
-        template_id = model.choose_template(int(regime), previous_template)
+        if root_values_path is None:
+            template_id = model.choose_template(int(regime), previous_template)
+        else:
+            template_id, diagnostics = model.choose_template_with_diagnostics(int(regime), previous_template)
+            diagnostics["date"] = date
+            root_value_rows.append(diagnostics)
         for asset, weight in templates[template_id].items():
             weights.loc[date, asset] = weight
+        template_rows.append(
+            {
+                "date": date,
+                "regime": int(regime),
+                "template_id": int(template_id),
+                "template_name": _template_name(templates[template_id]),
+                "spy_weight": float(templates[template_id].get("SPY", 0.0)),
+                "tlt_weight": float(templates[template_id].get("TLT", 0.0)),
+                "gld_weight": float(templates[template_id].get("GLD", 0.0)),
+            }
+        )
         previous_template = template_id
 
+    if template_path is not None:
+        pd.DataFrame(template_rows).to_csv(template_path, index=False)
+    if root_values_path is not None:
+        root_values = pd.DataFrame(root_value_rows)
+        first_cols = ["date", "regime", "previous_template", "chosen_template"]
+        value_cols = [f"value_template_{action}" for action in range(len(templates))]
+        visit_cols = [f"visits_template_{action}" for action in range(len(templates))]
+        root_values = root_values[first_cols + value_cols + visit_cols]
+        root_values.to_csv(root_values_path, index=False)
+
     return weights.ffill().fillna(0.0)
+
+
+def _template_name(template: dict[str, float]) -> str:
+    if not template:
+        return "100% cash"
+    return " + ".join(f"{weight:.0%} {asset}" for asset, weight in template.items())

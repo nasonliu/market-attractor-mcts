@@ -13,18 +13,21 @@ The root-child selection now explicitly uses average value (`child.value / child
 ## Current MCTS config
 
 ```text
-              parameter                       value
-                  asset                         SPY
-              positions [0.0, 0.25, 0.5, 0.75, 1.0]
-                horizon                           5
-    simulations_per_day                         100
-   exploration_constant                    1.414214
-                sampler                        path
-   use_full_action_grid                       False
-             prior_band                        0.25
-       drawdown_penalty                         0.1
-opportunity_cost_weight                         0.2
-   transaction_cost_bps                         2.0
+                           parameter                       value
+                               asset                         SPY
+                           positions [0.0, 0.25, 0.5, 0.75, 1.0]
+                             horizon                           5
+                 simulations_per_day                         100
+                exploration_constant                    1.414214
+                             sampler                        path
+                use_full_action_grid                       False
+                          prior_band                         0.5
+                    drawdown_penalty                         0.1
+             opportunity_cost_weight                         0.2
+            action_inertia_threshold                      0.0005
+       multi_asset_hold_rollout_prob                        0.95
+multi_asset_action_inertia_threshold                       0.001
+                transaction_cost_bps                         2.0
 ```
 
 ## Second-round changes
@@ -37,6 +40,9 @@ opportunity_cost_weight                         0.2
 - Added `Regime Rule SPY/Cash` to compare SPY-only timing against SPY-only MCTS.
 - Added `Market Attractor MCTS MultiAsset`, which chooses among five discrete SPY/TLT/GLD/cash templates.
 - Added `mcts_root_values.csv` to inspect the root action values and visits each day.
+- Widened `prior_band` and always includes the previous SPY position plus `50%` in the candidate set, so the search is no longer only a binary perturbation of the prior.
+- Added a small configurable action-inertia threshold to avoid switching when the estimated root-value edge is tiny.
+- MultiAsset rollout now heavily favors holding the current template, and MultiAsset emits template path/root-value diagnostics.
 
 ## Prior-restricted versus full-grid MCTS
 
@@ -46,15 +52,15 @@ When `use_full_action_grid` is `false`, MCTS only evaluates positions inside `pr
 
 The table below summarizes average root values and average visits by action. In prior-restricted mode, actions outside the prior band correctly show zero visits for many days, so a low-visit high/low action means "not evaluated under the configured prior", not necessarily "bad action".
 
-This run used a prior-restricted grid with prior_band=0.25. The highest average root value was action `1.0`, while low actions `0.0/0.25` were chosen on `63.85%` of evaluated days. If high actions have better root values but low actions are frequently chosen, the evidence points toward prior/action-set restriction or regime labeling rather than a root-value function that is intrinsically biased toward cash.
+This run used a prior-restricted grid with prior_band=0.5. The highest average root value was action `1.0`, while low actions `0.0/0.25` were chosen on `36.92%` of evaluated days. If high actions have better root values but low actions are frequently chosen, the evidence points toward prior/action-set restriction or regime labeling rather than a root-value function that is intrinsically biased toward cash.
 
 ```text
  action  avg_root_value  avg_visits
-   0.00       -0.000486   31.942675
-   0.25       -0.000611   31.904459
-   0.50             NaN    0.000000
-   0.75        0.001397   18.020892
-   1.00        0.002749   18.131975
+   0.00       -0.000630   21.261656
+   0.25       -0.000820   21.280000
+   0.50       -0.000566   33.059363
+   0.75        0.000619   12.112102
+   1.00        0.000729   12.286879
 ```
 
 Chosen SPY-only MCTS action shares:
@@ -62,10 +68,11 @@ Chosen SPY-only MCTS action shares:
 ```text
                  chosen_share
 chosen_position              
-0.00                 0.308280
-0.25                 0.330191
-0.75                 0.174013
-1.00                 0.187516
+0.00                 0.164076
+0.25                 0.205096
+0.50                 0.369682
+0.75                 0.126369
+1.00                 0.134777
 ```
 
 ## Latest metrics
@@ -77,8 +84,8 @@ chosen_position
                       Vol Target      3.642787 0.098209    0.101670 0.973871     -0.128098 0.766671        0.550679            0.017483
                      Regime Rule      7.258470 0.137488    0.158667 0.892751     -0.283190 0.485496        0.548982            0.071532
             Regime Rule SPY/Cash      2.328073 0.076125    0.130513 0.628409     -0.283190 0.268813        0.194714            0.035645
-           Market Attractor MCTS      1.860642 0.066233    0.117079 0.607289     -0.264585 0.250329        0.362027            0.138094
-Market Attractor MCTS MultiAsset      0.812304 0.036947    0.126649 0.350171     -0.241341 0.153090        0.455868            0.806014
+           Market Attractor MCTS      2.185766 0.073260    0.109277 0.702688     -0.201200 0.364114        0.438894            0.199260
+Market Attractor MCTS MultiAsset      1.905143 0.067238    0.124175 0.586967     -0.303002 0.221906        0.459505            0.757396
 ```
 
 ## Strategy position diagnostics
@@ -90,16 +97,41 @@ Market Attractor MCTS MultiAsset      0.812304 0.036947    0.126649 0.350171    
                       Vol Target      0.758327             4.407098           0.0           1.0            0.004850             0.000000             0.000242             0.000000              0.315713
                      Regime Rule      0.344083            17.965082           0.0           1.0            0.655917             0.000000             0.000000             0.000000              0.344083
             Regime Rule SPY/Cash      0.344083             8.982541           0.0           1.0            0.655917             0.000000             0.000000             0.000000              0.344083
-           Market Attractor MCTS      0.381244            34.799709           0.0           1.0            0.341659             0.314258             0.000000             0.165616              0.178468
-Market Attractor MCTS MultiAsset      0.493514           203.115422           0.0           1.0            0.366392             0.000000             0.177740             0.204898              0.250970
+           Market Attractor MCTS      0.443198            50.228904           0.0           1.0            0.204413             0.195199             0.351843             0.120272              0.128274
+Market Attractor MCTS MultiAsset      0.505335           190.894277           0.0           1.0            0.354510             0.000000             0.178468             0.203686              0.263337
 ```
 
 ## MCTS by regime
 
 ```text
  regime  mcts_avg_position  regime_rule_position  next_5d_return  next_20d_return
-    0.0           0.878878                   1.0        0.004370         0.014662
-    1.0           0.134420                   0.0        0.001007         0.004116
-    2.0           0.121975                   0.0        0.003668         0.013833
-    3.0           0.879234                   1.0        0.004396         0.022933
+    0.0           0.762828                   1.0        0.004370         0.014662
+    1.0           0.298540                   0.0        0.001007         0.004116
+    2.0           0.297919                   0.0        0.003668         0.013833
+    3.0           0.758467                   1.0        0.004396         0.022933
+```
+
+## MultiAsset template diagnostics
+
+```text
+Daily template transition rate: 73.58%
+
+                             template_share
+template_name                              
+100% SPY                           0.276688
+50% TLT + 50% GLD                  0.219363
+75% SPY + 25% TLT                  0.214013
+50% SPY + 25% TLT + 25% GLD        0.187516
+100% cash                          0.102420
+```
+
+MultiAsset root values:
+
+```text
+ template  avg_root_value  avg_visits
+        0       -0.000846   20.002803
+        1       -0.000829   20.005096
+        2       -0.000658   20.007134
+        3       -0.001534   19.967643
+        4       -0.000423   20.017325
 ```

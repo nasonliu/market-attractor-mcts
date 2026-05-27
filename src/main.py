@@ -75,6 +75,8 @@ def main() -> None:
         regimes,
         config,
         method="hmm_regime",
+        template_path=REPORTS_DIR / "multi_asset_mcts_template.csv",
+        root_values_path=REPORTS_DIR / "multi_asset_mcts_root_values.csv",
     )
 
     strategy_weights = {
@@ -155,6 +157,8 @@ def main() -> None:
     )
     mcts_regime_stats.to_csv(REPORTS_DIR / "mcts_regime_stats.csv", index=False)
     root_values = pd.read_csv(REPORTS_DIR / "mcts_root_values.csv")
+    multi_asset_templates = pd.read_csv(REPORTS_DIR / "multi_asset_mcts_template.csv")
+    multi_asset_root_values = pd.read_csv(REPORTS_DIR / "multi_asset_mcts_root_values.csv")
     write_diagnostics_markdown(
         REPORTS_DIR / "diagnostics.md",
         metrics,
@@ -162,6 +166,8 @@ def main() -> None:
         mcts_regime_stats,
         config["mcts"],
         root_values,
+        multi_asset_templates,
+        multi_asset_root_values,
     )
 
     print(f"Wrote outputs to {OUTPUT_DIR}")
