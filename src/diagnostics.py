@@ -69,7 +69,32 @@ def write_diagnostics_markdown(
     metrics: pd.DataFrame,
     strategy_diagnostics: pd.DataFrame,
     mcts_regime_stats: pd.DataFrame,
+    mcts_config: dict,
+    root_values: pd.DataFrame,
 ) -> None:
+    root_rows = []
+    for level in POSITION_LEVELS:
+        suffix = int(level * 100)
+        root_rows.append(
+            {
+                "action": level,
+                "avg_root_value": root_values.get(f"value_{suffix}", pd.Series(dtype=float)).mean(),
+                "avg_visits": root_values.get(f"visits_{suffix}", pd.Series(dtype=float)).mean(),
+            }
+        )
+    root_summary = pd.DataFrame(root_rows)
+    chosen_counts = root_values["chosen_position"].value_counts(normalize=True).sort_index().to_frame("chosen_share")
+    config_frame = pd.DataFrame(
+        [{"parameter": key, "value": value} for key, value in mcts_config.items()]
+    )
+    best_root_action = root_summary.sort_values("avg_root_value", ascending=False)["action"].iloc[0]
+    low_action_share = float(root_values["chosen_position"].isin([0.0, 0.25]).mean())
+    full_grid_state = (
+        "full action grid"
+        if bool(mcts_config.get("use_full_action_grid", False))
+        else f"prior-restricted grid with prior_band={mcts_config.get('prior_band')}"
+    )
+
     content = f"""# MCTS Diagnostics
 
 ## Why the first MCTS version likely lagged
@@ -78,16 +103,46 @@ def write_diagnostics_markdown(
 - The drawdown penalty was high relative to the daily return scale, which encouraged defensive actions even in historically positive regimes.
 - Rollouts were guided only by average single-day regime return and had no strong connection to the Regime Rule signal that performed well.
 - The search used the full action grid every day, which increased switching and made the strategy pay more transaction costs.
+- The original comparison was not fully fair: `Regime Rule` could rotate into TLT/GLD during risk-off regimes, while SPY-only MCTS could only choose SPY or cash.
 
 The root-child selection now explicitly uses average value (`child.value / child.visits`). The previous code already did this, and the implementation keeps that behavior.
 
-## Changes in this version
+## Current MCTS config
+
+```text
+{config_frame.to_string(index=False)}
+```
+
+## Second-round changes
 
 - MCTS defaults to a path sampler: it samples historical continuous SPY return paths from dates that share the current regime.
 - The reward is simplified to return minus transaction cost, with a much smaller configurable risk penalty.
 - A positive next-20-day regime expectation now creates an opportunity cost for low exposure.
 - Regime Rule SPY exposure is used as a prior, and the action set defaults to positions within +/-25 percentage points of that prior.
 - Position diagnostics, MCTS position curves, and regime-level MCTS positioning reports are written under `reports/`.
+- Added `Regime Rule SPY/Cash` to compare SPY-only timing against SPY-only MCTS.
+- Added `Market Attractor MCTS MultiAsset`, which chooses among five discrete SPY/TLT/GLD/cash templates.
+- Added `mcts_root_values.csv` to inspect the root action values and visits each day.
+
+## Prior-restricted versus full-grid MCTS
+
+When `use_full_action_grid` is `false`, MCTS only evaluates positions inside `prior_position +/- prior_band`. This makes the search more stable and lowers action churn, but it can also inherit a bad prior. In this project that matters because the prior comes from Regime Rule's SPY leg: risk-off regimes have SPY prior `0`, even though the original Regime Rule may still earn return through TLT/GLD. Setting `use_full_action_grid: true` lets every day evaluate all SPY weights, but it also increases exploration and turnover.
+
+## Root action value bias
+
+The table below summarizes average root values and average visits by action. In prior-restricted mode, actions outside the prior band correctly show zero visits for many days, so a low-visit high/low action means "not evaluated under the configured prior", not necessarily "bad action".
+
+This run used a {full_grid_state}. The highest average root value was action `{best_root_action}`, while low actions `0.0/0.25` were chosen on `{low_action_share:.2%}` of evaluated days. If high actions have better root values but low actions are frequently chosen, the evidence points toward prior/action-set restriction or regime labeling rather than a root-value function that is intrinsically biased toward cash.
+
+```text
+{root_summary.to_string(index=False)}
+```
+
+Chosen SPY-only MCTS action shares:
+
+```text
+{chosen_counts.to_string()}
+```
 
 ## Latest metrics
 

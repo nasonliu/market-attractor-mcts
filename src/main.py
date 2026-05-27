@@ -13,10 +13,10 @@ from src.diagnostics import (
     write_diagnostics_markdown,
 )
 from src.features import build_features
-from src.mcts import build_mcts_weights
+from src.mcts import build_mcts_weights, build_multi_asset_mcts_weights
 from src.plots import plot_drawdowns, plot_equity_curves, plot_mcts_position
 from src.regime import compute_regime_summary, identify_regimes
-from src.strategies import buy_and_hold, ma200_trend, regime_rule, vol_target
+from src.strategies import buy_and_hold, ma200_trend, regime_rule, regime_rule_spy_cash, vol_target
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,12 +57,24 @@ def main() -> None:
         safe_assets=list(config["backtest"]["regime_rule_safe_assets"]),
         method="hmm_regime",
     )
+    regime_rule_spy_cash_weights = regime_rule_spy_cash(
+        prices,
+        regimes,
+        method="hmm_regime",
+    )
     mcts_weights = build_mcts_weights(
         prices,
         regimes,
         config,
         method="hmm_regime",
         prior_weights=regime_rule_weights,
+        root_values_path=REPORTS_DIR / "mcts_root_values.csv",
+    )
+    multi_asset_mcts_weights = build_multi_asset_mcts_weights(
+        prices,
+        regimes,
+        config,
+        method="hmm_regime",
     )
 
     strategy_weights = {
@@ -70,7 +82,9 @@ def main() -> None:
         "MA200 Trend": ma200_weights,
         "Vol Target": vol_target_weights,
         "Regime Rule": regime_rule_weights,
+        "Regime Rule SPY/Cash": regime_rule_spy_cash_weights,
         "Market Attractor MCTS": mcts_weights,
+        "Market Attractor MCTS MultiAsset": multi_asset_mcts_weights,
     }
 
     metrics_rows = []
@@ -80,7 +94,7 @@ def main() -> None:
     for name, weights in strategy_weights.items():
         cost_bps = (
             float(config["mcts"]["transaction_cost_bps"])
-            if name == "Market Attractor MCTS"
+            if name.startswith("Market Attractor MCTS")
             else float(config["backtest"]["transaction_cost_bps"])
         )
         result = run_backtest(
@@ -127,6 +141,9 @@ def main() -> None:
         trading_days=trading_days,
     )
     strategy_diagnostics.to_csv(REPORTS_DIR / "strategy_diagnostics.csv", index=False)
+    pd.DataFrame(
+        [{"parameter": key, "value": value} for key, value in config["mcts"].items()]
+    ).to_csv(REPORTS_DIR / "mcts_config.csv", index=False)
 
     mcts_regime_stats = mcts_regime_position_stats(
         prices,
@@ -137,11 +154,14 @@ def main() -> None:
         method="hmm_regime",
     )
     mcts_regime_stats.to_csv(REPORTS_DIR / "mcts_regime_stats.csv", index=False)
+    root_values = pd.read_csv(REPORTS_DIR / "mcts_root_values.csv")
     write_diagnostics_markdown(
         REPORTS_DIR / "diagnostics.md",
         metrics,
         strategy_diagnostics,
         mcts_regime_stats,
+        config["mcts"],
+        root_values,
     )
 
     print(f"Wrote outputs to {OUTPUT_DIR}")

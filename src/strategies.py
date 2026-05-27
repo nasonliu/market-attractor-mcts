@@ -54,5 +54,20 @@ def regime_rule(
     return weights.fillna(0.0)
 
 
+def regime_rule_spy_cash(
+    prices: pd.DataFrame,
+    regimes: pd.DataFrame,
+    method: str = "hmm_regime",
+) -> pd.DataFrame:
+    weights = _empty_weights(prices)
+    labels = regimes[method].reindex(prices.index).ffill()
+    future_20d = prices["SPY"].pct_change(20, fill_method=None).shift(-20)
+    scores = future_20d.groupby(labels).mean().dropna().sort_values(ascending=False)
+    favorable = set(scores.head(max(1, len(scores) // 2)).index)
+
+    weights.loc[labels.isin(favorable), "SPY"] = 1.0
+    return weights.fillna(0.0)
+
+
 def _empty_weights(prices: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
