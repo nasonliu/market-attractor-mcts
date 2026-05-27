@@ -1,0 +1,13 @@
+experiment:
+  name: exp_horizon10_inertia_002
+  description: Add action inertia threshold 0.002 on top of the horizon=10 SPY-only MCTS candidate.
+  hypothesis: Horizon=10 improved SPY-only MCTS, but turnover remains high; adding stronger action inertia can improve drawdown and Calmar without overly sacrificing return.
+  changed_variable: mcts.action_inertia_threshold
+  baseline_experiment: exp_horizon_10
+  expected_result: SPY-only turnover decreases versus exp_horizon_10 and Calmar improves or remains close.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better, turnover decreases versus exp_horizon_10, and Calmar remains close to or better than exp_horizon_10.
+
+mcts:
+  sampler: "path"
+  horizon: 10
+  action_inertia_threshold: 0.002

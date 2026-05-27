@@ -1,0 +1,104 @@
+{
+  "experiment": "exp_horizon10_inertia_001",
+  "hypothesis": "Horizon=10 improved SPY-only MCTS, but turnover remains high; adding mild action inertia can preserve its Sharpe/Calmar while reducing unnecessary switches.",
+  "changed_variable": "mcts.action_inertia_threshold",
+  "baseline_experiment": "exp_horizon_10",
+  "expected_result": "SPY-only turnover decreases versus exp_horizon_10 while Sharpe or Calmar remains close.",
+  "success_criteria": "SPY MCTS gate remains WEAK PASS or better, turnover decreases versus exp_horizon_10, and Sharpe or Calmar does not materially deteriorate.",
+  "hypothesis_supported": true,
+  "decision": "KEEP_EXPLORATORY",
+  "primary_failure_mode": "multi_asset_turnover_too_high",
+  "next_recommended_experiment": "Test MultiAsset template persistence or turnover damping in a single-variable experiment.",
+  "gate_results": {
+    "spy_mcts_gate": "WEAK PASS",
+    "multi_asset_mcts_gate": "FAIL",
+    "overall_gate": "FAIL"
+  },
+  "best_metric_delta": {
+    "metric": "multi_asset_mcts_turnover_delta_vs_buy_hold",
+    "value": 0.7670950533462658
+  },
+  "worst_metric_delta": {
+    "metric": "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
+    "value": -0.5174505750143874
+  },
+  "leakage_level": "exploratory_full_sample",
+  "leakage_review": {
+    "leakage_level": "exploratory_full_sample",
+    "known_lookahead_sources": [
+      "full-sample regime fit",
+      "full-sample future-return regime ranking",
+      "full-sample MCTS path sampling"
+    ],
+    "blocks_run": false
+  },
+  "strategy_contract_review": {
+    "passed": true,
+    "strategies": {
+      "Buy & Hold": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "MA200 Trend": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Vol Target": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Regime Rule": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Regime Rule SPY/Cash": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Market Attractor MCTS": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      },
+      "Market Attractor MCTS MultiAsset": {
+        "passed": true,
+        "has_nan": false,
+        "index_aligned_with_prices": true,
+        "max_abs_weight_sum": 1.0,
+        "weight_abs_sum_lte_1_0001": true,
+        "turnover_calculable": true,
+        "abnormal_leverage": false
+      }
+    }
+  },
+  "recommendation": "Keep SPY-only setting for comparison; improve or constrain multi-asset MCTS before relying on it."
+}
