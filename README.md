@@ -34,16 +34,32 @@ market-attractor-mcts/
   config.yaml
   requirements.txt
   README.md
+  configs/
+    benchmark_v1.yaml
+    exp_*.yaml
   src/
     backtest.py
     config.py
     data.py
+    diagnostics.py
     features.py
     main.py
     mcts.py
     plots.py
     regime.py
+    run_experiments.py
     strategies.py
+  experiments/
+    comparison_summary.csv
+    results_summary.csv
+    report.md
+    <experiment_name>/
+      review.json
+      metrics.csv
+      equity_curve.csv
+      drawdown.csv
+      strategy_diagnostics.csv
+      mcts_root_values.csv
 ```
 
 Generated files are written to:

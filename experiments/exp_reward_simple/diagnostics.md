@@ -57,11 +57,11 @@ This run used a prior-restricted grid with prior_band=0.5. The highest average r
 
 ```text
  action  avg_root_value  avg_visits
-   0.00        0.000285   21.250955
+   0.00        0.000285   21.250701
    0.25        0.000449   21.279745
-   0.50        0.001794   33.098854
-   0.75        0.003257   12.119745
-   1.00        0.003970   12.250701
+   0.50        0.001794   33.099108
+   0.75        0.003255   12.119490
+   1.00        0.003971   12.250955
 ```
 
 Chosen SPY-only MCTS action shares:
@@ -69,8 +69,8 @@ Chosen SPY-only MCTS action shares:
 ```text
                  chosen_share
 chosen_position              
-0.00                 0.161529
-0.25                 0.202293
+0.00                 0.161274
+0.25                 0.202548
 0.50                 0.375287
 0.75                 0.118471
 1.00                 0.142420
@@ -80,13 +80,13 @@ chosen_position
 
 ```text
                         strategy  total_return     cagr  annual_vol   sharpe  max_drawdown   calmar  daily_win_rate  avg_daily_turnover
-                      Buy & Hold      7.849908 0.142299    0.171266 0.863989     -0.337173 0.422036        0.553589            0.000242
-                     MA200 Trend      3.904562 0.101891    0.114273 0.907802     -0.201590 0.505435        0.448351            0.019156
-                      Vol Target      3.642787 0.098209    0.101670 0.973871     -0.128098 0.766671        0.550679            0.017483
-                     Regime Rule      7.258470 0.137488    0.158667 0.892751     -0.283190 0.485496        0.548982            0.071532
-            Regime Rule SPY/Cash      2.328073 0.076125    0.130513 0.628409     -0.283190 0.268813        0.194714            0.035645
-           Market Attractor MCTS      2.324790 0.076060    0.110781 0.718508     -0.314583 0.241782        0.437924            0.197199
-Market Attractor MCTS MultiAsset      2.435643 0.078216    0.125029 0.665815     -0.320339 0.244166        0.472357            0.759821
+                      Buy & Hold      7.849912 0.142299    0.171266 0.863989     -0.337173 0.422035        0.553589            0.000242
+                     MA200 Trend      3.904566 0.101891    0.114273 0.907802     -0.201591 0.505435        0.448351            0.019156
+                      Vol Target      3.642770 0.098209    0.101670 0.973869     -0.128099 0.766667        0.550679            0.017483
+                     Regime Rule      7.258468 0.137488    0.158667 0.892750     -0.283190 0.485497        0.548982            0.071532
+            Regime Rule SPY/Cash      2.328077 0.076125    0.130513 0.628409     -0.283190 0.268813        0.194714            0.035645
+           Market Attractor MCTS      2.323296 0.076031    0.110781 0.718259     -0.314583 0.241688        0.437924            0.197199
+Market Attractor MCTS MultiAsset      2.435649 0.078216    0.125029 0.665815     -0.320340 0.244167        0.472357            0.759821
 ```
 
 ## Strategy position diagnostics
@@ -95,10 +95,10 @@ Market Attractor MCTS MultiAsset      2.435643 0.078216    0.125029 0.665815    
                         strategy  avg_position  annualized_turnover  min_position  max_position  position_0pct_days  position_25pct_days  position_50pct_days  position_75pct_days  position_100pct_days
                       Buy & Hold      1.000000             0.000000           1.0           1.0            0.000000             0.000000             0.000000             0.000000              1.000000
                      MA200 Trend      0.805529             4.827352           0.0           1.0            0.194471             0.000000             0.000000             0.000000              0.805529
-                      Vol Target      0.758327             4.407098           0.0           1.0            0.004850             0.000000             0.000242             0.000000              0.315713
+                      Vol Target      0.758327             4.407099           0.0           1.0            0.004850             0.000000             0.000242             0.000000              0.315713
                      Regime Rule      0.344083            17.965082           0.0           1.0            0.655917             0.000000             0.000000             0.000000              0.344083
             Regime Rule SPY/Cash      0.344083             8.982541           0.0           1.0            0.655917             0.000000             0.000000             0.000000              0.344083
-           Market Attractor MCTS      0.446836            49.709505           0.0           1.0            0.201988             0.192532             0.357177             0.112755              0.135548
+           Market Attractor MCTS      0.446896            49.709505           0.0           1.0            0.201746             0.192774             0.357177             0.112755              0.135548
 Market Attractor MCTS MultiAsset      0.516913           191.474782           0.0           1.0            0.335112             0.000000             0.187682             0.216537              0.260669
 ```
 
@@ -107,7 +107,7 @@ Market Attractor MCTS MultiAsset      0.516913           191.474782           0.
 ```text
  regime  mcts_avg_position  regime_rule_position  next_5d_return  next_20d_return
     0.0           0.764320                   1.0        0.004370         0.014662
-    1.0           0.299050                   0.0        0.001007         0.004116
+    1.0           0.299219                   0.0        0.001007         0.004116
     2.0           0.304211                   0.0        0.003668         0.013833
     3.0           0.771390                   1.0        0.004396         0.022933
 ```
@@ -131,8 +131,8 @@ MultiAsset root values:
 ```text
  template  avg_root_value  avg_visits
         0        0.001947   20.017070
-        1        0.001674   20.013248
-        2        0.001571   20.000000
+        1        0.001675   20.013248
+        2        0.001570   20.000000
         3        0.001286   19.981401
         4        0.001055   19.988280
 ```
@@ -146,13 +146,13 @@ SPY-only root edges:
 count             3925.000000          3925.000000     3925       3925
 unique                    NaN                  NaN        2          2
 top                       NaN                  NaN     True       True
-freq                      NaN                  NaN     2382       3765
+freq                      NaN                  NaN     2382       3767
 mean                 0.004822             0.004832      NaN        NaN
-std                  0.008353             0.008347      NaN        NaN
+std                  0.008353             0.008348      NaN        NaN
 min                  0.000000             0.000000      NaN        NaN
 25%                  0.000000             0.000000      NaN        NaN
 50%                  0.001769             0.001769      NaN        NaN
-75%                  0.005837             0.005837      NaN        NaN
+75%                  0.005846             0.005846      NaN        NaN
 max                  0.103088             0.103088      NaN        NaN
 ```
 
@@ -164,10 +164,10 @@ count             3925.000000          3925.000000     3925       3925
 unique                    NaN                  NaN        2          2
 top                       NaN                  NaN     True       True
 freq                      NaN                  NaN     2906       3792
-mean                 0.008573             0.008589      NaN        NaN
+mean                 0.008572             0.008588      NaN        NaN
 std                  0.009707             0.009693      NaN        NaN
 min                  0.000000             0.000000      NaN        NaN
-25%                  0.000000             0.000706      NaN        NaN
+25%                  0.000000             0.000707      NaN        NaN
 50%                  0.006391             0.006391      NaN        NaN
 75%                  0.012572             0.012572      NaN        NaN
 max                  0.105961             0.105961      NaN        NaN

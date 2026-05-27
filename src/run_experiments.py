@@ -81,10 +81,30 @@ def main() -> None:
             metrics[key] = value
         for key, value in gates.items():
             metrics[key] = value
+        for key in (
+            "hypothesis_supported",
+            "decision",
+            "primary_failure_mode",
+            "next_recommended_experiment",
+            "leakage_level",
+        ):
+            metrics[key] = review[key]
         for key, value in comparisons.items():
             metrics[key] = value
         all_rows.append(metrics)
-        experiment_summaries.append({**metadata, **gates, **comparisons})
+        experiment_summaries.append(
+            {
+                **metadata,
+                **gates,
+                "hypothesis_supported": review["hypothesis_supported"],
+                "decision": review["decision"],
+                "primary_failure_mode": review["primary_failure_mode"],
+                "next_recommended_experiment": review["next_recommended_experiment"],
+                "leakage_level": review["leakage_level"],
+                "contract_review_passed": contract_review["passed"],
+                **comparisons,
+            }
+        )
 
         args.force_download = False
 
@@ -166,6 +186,7 @@ def _delta_metrics(prefix: str, label: str, strategy: pd.Series, benchmark: pd.S
     return {
         f"{prefix}_cagr_delta_vs_{label}": float(strategy["cagr"] - benchmark["cagr"]),
         f"{prefix}_sharpe_delta_vs_{label}": float(strategy["sharpe"] - benchmark["sharpe"]),
+        f"{prefix}_calmar_delta_vs_{label}": float(strategy["calmar"] - benchmark["calmar"]),
         f"{prefix}_max_drawdown_delta_vs_{label}": float(
             strategy["max_drawdown"] - benchmark["max_drawdown"]
         ),
@@ -255,6 +276,14 @@ def _build_review(
     contract_review: dict[str, Any],
 ) -> dict[str, Any]:
     best_worst = _best_worst_metric_deltas(comparisons)
+    hypothesis_supported = _hypothesis_supported(gates, comparisons, metadata)
+    decision = _decision(gates, comparisons, contract_review)
+    primary_failure_mode = _primary_failure_mode(gates, comparisons, contract_review)
+    next_recommended_experiment = _next_recommended_experiment_for_review(
+        decision,
+        primary_failure_mode,
+        metadata,
+    )
     return {
         "experiment": metadata["experiment"],
         "hypothesis": metadata["hypothesis"],
@@ -262,6 +291,10 @@ def _build_review(
         "baseline_experiment": metadata["baseline_experiment"],
         "expected_result": metadata["expected_result"],
         "success_criteria": metadata["success_criteria"],
+        "hypothesis_supported": hypothesis_supported,
+        "decision": decision,
+        "primary_failure_mode": primary_failure_mode,
+        "next_recommended_experiment": next_recommended_experiment,
         "gate_results": gates,
         **best_worst,
         "leakage_level": leakage_review["leakage_level"],
@@ -269,6 +302,91 @@ def _build_review(
         "strategy_contract_review": contract_review,
         "recommendation": _recommendation(gates, contract_review),
     }
+
+
+def _hypothesis_supported(
+    gates: dict[str, str],
+    comparisons: dict[str, float],
+    metadata: dict[str, str],
+) -> bool | str:
+    changed_variable = metadata["changed_variable"]
+    if changed_variable == "none":
+        return "inconclusive"
+    spy_close = gates["spy_mcts_gate"] in {"PASS", "WEAK PASS"}
+    multi_close = gates["multi_asset_mcts_gate"] in {"PASS", "WEAK PASS"}
+    if spy_close and comparisons["spy_mcts_sharpe_delta_vs_regime_rule_spy_cash"] >= 0:
+        return True
+    if multi_close and comparisons["multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset"] >= 0:
+        return True
+    if gates["spy_mcts_gate"] == "FAIL" and gates["multi_asset_mcts_gate"] == "FAIL":
+        return False
+    return "inconclusive"
+
+
+def _decision(
+    gates: dict[str, str],
+    comparisons: dict[str, float],
+    contract_review: dict[str, Any],
+) -> str:
+    if not contract_review["passed"]:
+        return "REJECT"
+    if gates["spy_mcts_gate"] == "PASS" or gates["multi_asset_mcts_gate"] == "PASS":
+        return "PROMOTE"
+    spy_mixed = (
+        gates["spy_mcts_gate"] == "WEAK PASS"
+        and comparisons["spy_mcts_sharpe_delta_vs_regime_rule_spy_cash"] > 0
+        and comparisons["spy_mcts_calmar_delta_vs_regime_rule_spy_cash"] > -0.05
+    )
+    multi_mixed = (
+        gates["multi_asset_mcts_gate"] == "WEAK PASS"
+        and comparisons["multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset"] > 0
+        and comparisons["multi_asset_mcts_calmar_delta_vs_regime_rule_multiasset"] > -0.05
+    )
+    if spy_mixed or multi_mixed:
+        return "KEEP_EXPLORATORY"
+    if gates["spy_mcts_gate"] == "WEAK PASS" or gates["multi_asset_mcts_gate"] == "WEAK PASS":
+        return "NEEDS_FOLLOWUP"
+    return "REJECT"
+
+
+def _primary_failure_mode(
+    gates: dict[str, str],
+    comparisons: dict[str, float],
+    contract_review: dict[str, Any],
+) -> str:
+    if not contract_review["passed"]:
+        return "strategy_contract_violation"
+    if gates["multi_asset_mcts_gate"] == "FAIL" and comparisons["multi_asset_mcts_turnover_delta_vs_regime_rule_multiasset"] > 0.25:
+        return "multi_asset_turnover_too_high"
+    if gates["spy_mcts_gate"] == "FAIL" and comparisons["spy_mcts_turnover_delta_vs_regime_rule_spy_cash"] > 0.10:
+        return "spy_mcts_turnover_too_high"
+    if comparisons["spy_mcts_max_drawdown_delta_vs_regime_rule_spy_cash"] < -0.05:
+        return "spy_mcts_drawdown_worse"
+    if comparisons["spy_mcts_sharpe_delta_vs_regime_rule_spy_cash"] < 0:
+        return "spy_mcts_sharpe_worse"
+    if comparisons["multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset"] < 0:
+        return "multi_asset_sharpe_worse"
+    return "none_or_mixed"
+
+
+def _next_recommended_experiment_for_review(
+    decision: str,
+    primary_failure_mode: str,
+    metadata: dict[str, str],
+) -> str:
+    if decision == "PROMOTE":
+        return "Promote this config as a benchmark candidate and retest robustness."
+    if primary_failure_mode == "multi_asset_turnover_too_high":
+        return "Test MultiAsset template persistence or turnover damping in a single-variable experiment."
+    if primary_failure_mode == "spy_mcts_turnover_too_high":
+        return "Test action_inertia_threshold variants in a single-variable experiment."
+    if primary_failure_mode == "spy_mcts_drawdown_worse":
+        return "Test lower-risk reward settings or drawdown penalty variants."
+    if primary_failure_mode == "spy_mcts_sharpe_worse":
+        return "Compare sampler or horizon variants before changing portfolio logic."
+    if decision == "REJECT":
+        return "Do not extend this branch; return to benchmark_v1 or the best WEAK PASS experiment."
+    return f"Follow up on {metadata['changed_variable']} with a narrower single-variable experiment."
 
 
 def _recommendation(gates: dict[str, str], contract_review: dict[str, Any]) -> str:
@@ -311,6 +429,17 @@ def _write_report(path: Path, results_summary: pd.DataFrame, comparison_summary:
         "multi_asset_mcts_gate",
         "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
     ).head(5)
+    best_spy_calmar = spy_rows.sort_values(
+        "spy_mcts_calmar_delta_vs_regime_rule_spy_cash",
+        ascending=False,
+    ).head(5)
+    best_multi_calmar = multi_rows.sort_values(
+        "multi_asset_mcts_calmar_delta_vs_regime_rule_multiasset",
+        ascending=False,
+    ).head(5)
+    promote = comparison_summary.loc[comparison_summary["decision"] == "PROMOTE"]
+    followup = comparison_summary.loc[comparison_summary["decision"] == "NEEDS_FOLLOWUP"]
+    rejected = comparison_summary.loc[comparison_summary["decision"] == "REJECT"]
     next_experiments = _next_recommended_experiments(comparison_summary)
     leakage = _leakage_review()
     lines = [
@@ -410,7 +539,57 @@ def _write_report(path: Path, results_summary: pd.DataFrame, comparison_summary:
         ].to_string(index=False),
         "```",
         "",
-        "## Next Recommended Experiments",
+        "## Best by SPY MCTS Calmar Delta",
+        "",
+        "```text",
+        best_spy_calmar[
+            [
+                "experiment",
+                "spy_mcts_gate",
+                "cagr",
+                "sharpe",
+                "calmar",
+                "max_drawdown",
+                "spy_mcts_calmar_delta_vs_regime_rule_spy_cash",
+            ]
+        ].to_string(index=False),
+        "```",
+        "",
+        "## Best by MultiAsset MCTS Calmar Delta",
+        "",
+        "```text",
+        best_multi_calmar[
+            [
+                "experiment",
+                "multi_asset_mcts_gate",
+                "cagr",
+                "sharpe",
+                "calmar",
+                "max_drawdown",
+                "multi_asset_mcts_calmar_delta_vs_regime_rule_multiasset",
+            ]
+        ].to_string(index=False),
+        "```",
+        "",
+        "## Experiments to Promote",
+        "",
+        "```text",
+        _decision_table(promote),
+        "```",
+        "",
+        "## Experiments Needing Follow-up",
+        "",
+        "```text",
+        _decision_table(followup),
+        "```",
+        "",
+        "## Rejected Experiments",
+        "",
+        "```text",
+        _decision_table(rejected),
+        "```",
+        "",
+        "## Recommended Next Experiments",
         "",
         *[f"- {item}" for item in next_experiments],
         "",
@@ -444,6 +623,20 @@ def _sort_by_gate(rows: pd.DataFrame, gate_col: str, score_col: str) -> pd.DataF
     sortable = rows.copy()
     sortable["_gate_rank"] = sortable[gate_col].map(gate_rank).fillna(99)
     return sortable.sort_values(["_gate_rank", score_col, "cagr"], ascending=[True, False, False])
+
+
+def _decision_table(rows: pd.DataFrame) -> str:
+    if rows.empty:
+        return "None"
+    return rows[
+        [
+            "experiment",
+            "decision",
+            "hypothesis_supported",
+            "primary_failure_mode",
+            "next_recommended_experiment",
+        ]
+    ].to_string(index=False)
 
 
 def _next_recommended_experiments(comparison_summary: pd.DataFrame) -> list[str]:

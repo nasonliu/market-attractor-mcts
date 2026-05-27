@@ -5,6 +5,10 @@
   "baseline_experiment": "benchmark_v1",
   "expected_result": "CAGR improves, possibly with worse drawdown.",
   "success_criteria": "SPY MCTS CAGR delta versus Regime Rule SPY/Cash improves without FAIL gate.",
+  "hypothesis_supported": true,
+  "decision": "KEEP_EXPLORATORY",
+  "primary_failure_mode": "multi_asset_turnover_too_high",
+  "next_recommended_experiment": "Test MultiAsset template persistence or turnover damping in a single-variable experiment.",
   "gate_results": {
     "spy_mcts_gate": "WEAK PASS",
     "multi_asset_mcts_gate": "FAIL",
@@ -15,8 +19,8 @@
     "value": 0.7595780795344327
   },
   "worst_metric_delta": {
-    "metric": "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
-    "value": -0.2269358363789541
+    "metric": "spy_mcts_calmar_delta_vs_regime_rule_multiasset",
+    "value": -0.24380843458091125
   },
   "leakage_level": "exploratory_full_sample",
   "leakage_review": {

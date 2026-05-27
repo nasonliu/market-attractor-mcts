@@ -5,6 +5,10 @@
   "baseline_experiment": "benchmark_v1",
   "expected_result": "Sharpe or CAGR improves versus exp_sampler_daily.",
   "success_criteria": "SPY MCTS gate remains WEAK PASS or better and beats daily sampler on Sharpe.",
+  "hypothesis_supported": true,
+  "decision": "KEEP_EXPLORATORY",
+  "primary_failure_mode": "multi_asset_turnover_too_high",
+  "next_recommended_experiment": "Test MultiAsset template persistence or turnover damping in a single-variable experiment.",
   "gate_results": {
     "spy_mcts_gate": "WEAK PASS",
     "multi_asset_mcts_gate": "FAIL",
@@ -12,11 +16,11 @@
   },
   "best_metric_delta": {
     "metric": "multi_asset_mcts_turnover_delta_vs_buy_hold",
-    "value": 0.757153249272551
+    "value": 0.7570320077594569
   },
   "worst_metric_delta": {
     "metric": "multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset",
-    "value": -0.3057835093770179
+    "value": -0.3090261671090452
   },
   "leakage_level": "exploratory_full_sample",
   "leakage_review": {
