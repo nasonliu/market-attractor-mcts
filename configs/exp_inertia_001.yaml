@@ -1,0 +1,12 @@
+experiment:
+  name: exp_inertia_001
+  description: Increase SPY-only MCTS action inertia threshold to 0.001.
+  hypothesis: MCTS turnover is too high; a stronger action inertia threshold can reduce small value-edge switches and improve risk-adjusted performance.
+  changed_variable: mcts.action_inertia_threshold
+  baseline_experiment: benchmark_v1
+  expected_result: SPY-only MCTS turnover decreases versus benchmark_v1 without lowering Sharpe or Calmar.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better, turnover decreases, and Sharpe or Calmar does not deteriorate versus benchmark_v1.
+
+mcts:
+  sampler: "path"
+  action_inertia_threshold: 0.001
