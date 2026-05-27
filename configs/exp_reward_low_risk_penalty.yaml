@@ -1,0 +1,13 @@
+experiment:
+  name: exp_reward_low_risk_penalty
+  description: Reward keeps a smaller risk penalty and lower opportunity cost than benchmark_v1.
+  hypothesis: The benchmark reward is too conservative; lowering both drawdown penalty and opportunity cost improves SPY-only MCTS without fully removing risk control.
+  changed_variable: mcts.drawdown_penalty and mcts.opportunity_cost_weight
+  baseline_experiment: benchmark_v1
+  expected_result: SPY-only MCTS improves CAGR, Sharpe, or Calmar versus benchmark_v1 while drawdown remains close to Regime Rule SPY/Cash.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better and either Sharpe or Calmar delta improves versus benchmark_v1.
+
+mcts:
+  sampler: "path"
+  drawdown_penalty: 0.05
+  opportunity_cost_weight: 0.1
