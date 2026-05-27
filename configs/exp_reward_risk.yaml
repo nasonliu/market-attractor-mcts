@@ -1,0 +1,8 @@
+experiment:
+  name: exp_reward_risk
+  description: Reward includes reduced drawdown penalty and opportunity cost.
+
+mcts:
+  sampler: "path"
+  drawdown_penalty: 0.1
+  opportunity_cost_weight: 0.2

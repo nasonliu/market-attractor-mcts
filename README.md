@@ -90,6 +90,38 @@ Force a fresh yfinance download:
 python3 -m src.main --force-download
 ```
 
+## Run Experiment Matrix
+
+The reproducible benchmark suite lives under `configs/`. Each YAML file is merged onto `config.yaml`, then the same pipeline used by `src.main` is run into a dedicated experiment directory.
+
+```bash
+python3 -m src.run_experiments
+```
+
+Experiment outputs are written to:
+
+```text
+experiments/
+  results_summary.csv
+  comparison_summary.csv
+  report.md
+  benchmark_v1/
+    config_snapshot.yaml
+    metrics.csv
+    equity_curve.csv
+    drawdown.csv
+    strategy_diagnostics.csv
+    mcts_root_values.csv
+```
+
+The report assigns an acceptance gate for each experiment:
+
+- `PASS`: MCTS beats Regime Rule SPY/Cash on CAGR, Sharpe, max drawdown, and turnover.
+- `WEAK PASS`: MCTS is close to Regime Rule SPY/Cash on CAGR, Sharpe, and drawdown.
+- `FAIL`: MCTS is not close enough to the SPY-only regime benchmark.
+
+This matrix is still full-sample exploratory research, not walk-forward validation.
+
 ## Features
 
 The feature set includes:

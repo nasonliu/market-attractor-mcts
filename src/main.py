@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -9,6 +11,7 @@ from src.config import DATA_DIR, OUTPUT_DIR, PLOTS_DIR, REPORTS_DIR, ensure_dire
 from src.data import download_prices
 from src.diagnostics import (
     mcts_regime_position_stats,
+    root_edge_diagnostics,
     strategy_position_diagnostics,
     write_diagnostics_markdown,
 )
@@ -26,23 +29,30 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    ensure_directories()
-    config = load_config(args.config)
+def run_pipeline(
+    config: dict[str, Any],
+    data_dir: Path = DATA_DIR,
+    output_dir: Path = OUTPUT_DIR,
+    reports_dir: Path = REPORTS_DIR,
+    plots_dir: Path | None = None,
+    force_download: bool = False,
+) -> dict[str, pd.DataFrame]:
+    plots_dir = plots_dir or output_dir / "plots"
+    for path in (data_dir, output_dir, reports_dir, plots_dir):
+        path.mkdir(parents=True, exist_ok=True)
 
-    prices = download_prices(config, DATA_DIR, force=args.force_download)
-    prices.to_csv(DATA_DIR / "prices.csv")
+    prices = download_prices(config, data_dir, force=force_download)
+    prices.to_csv(data_dir / "prices.csv")
 
     features = build_features(prices, config)
-    features.to_csv(OUTPUT_DIR / "features.csv")
+    features.to_csv(output_dir / "features.csv")
 
     regimes, _ = identify_regimes(features, config)
-    regimes.to_csv(OUTPUT_DIR / "regime_labels.csv")
+    regimes.to_csv(output_dir / "regime_labels.csv")
 
     trading_days = int(config["backtest"]["trading_days"])
     regime_summary = compute_regime_summary(prices, regimes, trading_days=trading_days)
-    regime_summary.to_csv(OUTPUT_DIR / "regime_summary.csv", index=False)
+    regime_summary.to_csv(output_dir / "regime_summary.csv", index=False)
 
     buy_hold_weights = buy_and_hold(prices)
     ma200_weights = ma200_trend(prices, window=int(config["backtest"]["ma_window"]))
@@ -68,15 +78,15 @@ def main() -> None:
         config,
         method="hmm_regime",
         prior_weights=regime_rule_weights,
-        root_values_path=REPORTS_DIR / "mcts_root_values.csv",
+        root_values_path=reports_dir / "mcts_root_values.csv",
     )
     multi_asset_mcts_weights = build_multi_asset_mcts_weights(
         prices,
         regimes,
         config,
         method="hmm_regime",
-        template_path=REPORTS_DIR / "multi_asset_mcts_template.csv",
-        root_values_path=REPORTS_DIR / "multi_asset_mcts_root_values.csv",
+        template_path=reports_dir / "multi_asset_mcts_template.csv",
+        root_values_path=reports_dir / "multi_asset_mcts_root_values.csv",
     )
 
     strategy_weights = {
@@ -119,12 +129,12 @@ def main() -> None:
         )
 
     metrics = pd.DataFrame(metrics_rows)
-    metrics.to_csv(OUTPUT_DIR / "metrics.csv", index=False)
-    equity_curves.to_csv(OUTPUT_DIR / "equity_curve.csv")
-    drawdowns.to_csv(OUTPUT_DIR / "drawdown.csv")
+    metrics.to_csv(output_dir / "metrics.csv", index=False)
+    equity_curves.to_csv(output_dir / "equity_curve.csv")
+    drawdowns.to_csv(output_dir / "drawdown.csv")
 
-    plot_equity_curves(equity_curves, PLOTS_DIR)
-    plot_drawdowns(drawdowns, PLOTS_DIR)
+    plot_equity_curves(equity_curves, plots_dir)
+    plot_drawdowns(drawdowns, plots_dir)
 
     asset = str(config["mcts"]["asset"])
     mcts_position = pd.DataFrame(
@@ -134,18 +144,18 @@ def main() -> None:
         },
         index=prices.index,
     )
-    mcts_position.to_csv(REPORTS_DIR / "mcts_position.csv")
-    plot_mcts_position(mcts_position["mcts_position"], REPORTS_DIR)
+    mcts_position.to_csv(reports_dir / "mcts_position.csv")
+    plot_mcts_position(mcts_position["mcts_position"], reports_dir)
 
     strategy_diagnostics = strategy_position_diagnostics(
         strategy_weights,
         asset=asset,
         trading_days=trading_days,
     )
-    strategy_diagnostics.to_csv(REPORTS_DIR / "strategy_diagnostics.csv", index=False)
+    strategy_diagnostics.to_csv(reports_dir / "strategy_diagnostics.csv", index=False)
     pd.DataFrame(
         [{"parameter": key, "value": value} for key, value in config["mcts"].items()]
-    ).to_csv(REPORTS_DIR / "mcts_config.csv", index=False)
+    ).to_csv(reports_dir / "mcts_config.csv", index=False)
 
     mcts_regime_stats = mcts_regime_position_stats(
         prices,
@@ -155,12 +165,32 @@ def main() -> None:
         asset=asset,
         method="hmm_regime",
     )
-    mcts_regime_stats.to_csv(REPORTS_DIR / "mcts_regime_stats.csv", index=False)
-    root_values = pd.read_csv(REPORTS_DIR / "mcts_root_values.csv")
-    multi_asset_templates = pd.read_csv(REPORTS_DIR / "multi_asset_mcts_template.csv")
-    multi_asset_root_values = pd.read_csv(REPORTS_DIR / "multi_asset_mcts_root_values.csv")
+    mcts_regime_stats.to_csv(reports_dir / "mcts_regime_stats.csv", index=False)
+
+    root_values = pd.read_csv(reports_dir / "mcts_root_values.csv")
+    multi_asset_templates = pd.read_csv(reports_dir / "multi_asset_mcts_template.csv")
+    multi_asset_root_values = pd.read_csv(reports_dir / "multi_asset_mcts_root_values.csv")
+    spy_edge_diagnostics = root_edge_diagnostics(
+        root_values,
+        action_levels=[float(value) for value in config["mcts"]["positions"]],
+        chosen_col="chosen_position",
+        previous_col="previous_position",
+        value_prefix="value_",
+    )
+    spy_edge_diagnostics.to_csv(reports_dir / "mcts_root_edge_diagnostics.csv", index=False)
+    multi_asset_edge_diagnostics = root_edge_diagnostics(
+        multi_asset_root_values,
+        action_levels=[0, 1, 2, 3, 4],
+        chosen_col="chosen_template",
+        previous_col="previous_template",
+        value_prefix="value_template_",
+    )
+    multi_asset_edge_diagnostics.to_csv(
+        reports_dir / "multi_asset_mcts_root_edge_diagnostics.csv",
+        index=False,
+    )
     write_diagnostics_markdown(
-        REPORTS_DIR / "diagnostics.md",
+        reports_dir / "diagnostics.md",
         metrics,
         strategy_diagnostics,
         mcts_regime_stats,
@@ -168,11 +198,35 @@ def main() -> None:
         root_values,
         multi_asset_templates,
         multi_asset_root_values,
+        spy_edge_diagnostics,
+        multi_asset_edge_diagnostics,
+    )
+
+    return {
+        "metrics": metrics,
+        "equity_curves": equity_curves,
+        "drawdowns": drawdowns,
+        "strategy_diagnostics": strategy_diagnostics,
+        "mcts_root_values": root_values,
+    }
+
+
+def main() -> None:
+    args = parse_args()
+    ensure_directories()
+    config = load_config(args.config)
+    result = run_pipeline(
+        config,
+        data_dir=DATA_DIR,
+        output_dir=OUTPUT_DIR,
+        reports_dir=REPORTS_DIR,
+        plots_dir=PLOTS_DIR,
+        force_download=args.force_download,
     )
 
     print(f"Wrote outputs to {OUTPUT_DIR}")
     print(f"Wrote reports to {REPORTS_DIR}")
-    print(metrics.to_string(index=False))
+    print(result["metrics"].to_string(index=False))
 
 
 if __name__ == "__main__":

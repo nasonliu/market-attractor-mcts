@@ -139,6 +139,7 @@ class MarketAttractorMCTS:
         row: dict[str, float | int | None] = {
             "regime": int(current_regime),
             "prior_position": prior_position,
+            "previous_position": previous_position,
             "chosen_position": position,
         }
         for level in self.positions:
@@ -356,7 +357,7 @@ def build_mcts_weights(
 
     if root_values_path is not None:
         root_values = pd.DataFrame(root_value_rows)
-        first_cols = ["date", "regime", "prior_position", "chosen_position"]
+        first_cols = ["date", "regime", "prior_position", "previous_position", "chosen_position"]
         suffixes = [int(position * 100) for position in model.positions]
         value_cols = [f"value_{suffix}" for suffix in suffixes]
         visit_cols = [f"visits_{suffix}" for suffix in suffixes]

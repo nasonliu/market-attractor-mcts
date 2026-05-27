@@ -64,6 +64,53 @@ def mcts_regime_position_stats(
     )
 
 
+def root_edge_diagnostics(
+    root_values: pd.DataFrame,
+    action_levels: list[float | int],
+    chosen_col: str,
+    previous_col: str,
+    value_prefix: str,
+) -> pd.DataFrame:
+    rows = []
+    for _, row in root_values.iterrows():
+        action_values = {}
+        for action in action_levels:
+            suffix = int(action * 100) if isinstance(action, float) else int(action)
+            value = row.get(f"{value_prefix}{suffix}")
+            if pd.notna(value):
+                action_values[action] = float(value)
+        if not action_values:
+            continue
+
+        best_action = max(action_values, key=action_values.get)
+        chosen_action = row[chosen_col]
+        previous_action = row[previous_col]
+        chosen_value = action_values.get(chosen_action)
+        previous_value = action_values.get(previous_action)
+        best_value = action_values[best_action]
+        rows.append(
+            {
+                "date": row.get("date"),
+                "regime": row.get("regime"),
+                "previous_action": previous_action,
+                "chosen_action": chosen_action,
+                "best_action": best_action,
+                "chosen_value": chosen_value,
+                "previous_value": previous_value,
+                "best_value": best_value,
+                "chosen_minus_previous": None
+                if chosen_value is None or previous_value is None
+                else chosen_value - previous_value,
+                "best_minus_previous": None
+                if previous_value is None
+                else best_value - previous_value,
+                "switched": chosen_action != previous_action,
+                "chose_best": chosen_action == best_action,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def write_diagnostics_markdown(
     path,
     metrics: pd.DataFrame,
@@ -73,6 +120,8 @@ def write_diagnostics_markdown(
     root_values: pd.DataFrame,
     multi_asset_templates: pd.DataFrame | None = None,
     multi_asset_root_values: pd.DataFrame | None = None,
+    spy_edge_diagnostics: pd.DataFrame | None = None,
+    multi_asset_edge_diagnostics: pd.DataFrame | None = None,
 ) -> None:
     root_rows = []
     for level in POSITION_LEVELS:
@@ -123,6 +172,16 @@ def write_diagnostics_markdown(
                 }
             )
         multi_asset_root_summary = pd.DataFrame(rows).to_string(index=False)
+    spy_edge_summary = "No SPY root edge diagnostics were supplied."
+    if spy_edge_diagnostics is not None and not spy_edge_diagnostics.empty:
+        spy_edge_summary = spy_edge_diagnostics[
+            ["chosen_minus_previous", "best_minus_previous", "switched", "chose_best"]
+        ].describe(include="all").to_string()
+    multi_asset_edge_summary = "No MultiAsset root edge diagnostics were supplied."
+    if multi_asset_edge_diagnostics is not None and not multi_asset_edge_diagnostics.empty:
+        multi_asset_edge_summary = multi_asset_edge_diagnostics[
+            ["chosen_minus_previous", "best_minus_previous", "switched", "chose_best"]
+        ].describe(include="all").to_string()
 
     content = f"""# MCTS Diagnostics
 
@@ -155,6 +214,7 @@ The root-child selection now explicitly uses average value (`child.value / child
 - Widened `prior_band` and always includes the previous SPY position plus `50%` in the candidate set, so the search is no longer only a binary perturbation of the prior.
 - Added a small configurable action-inertia threshold to avoid switching when the estimated root-value edge is tiny.
 - MultiAsset rollout now heavily favors holding the current template, and MultiAsset emits template path/root-value diagnostics.
+- Added root edge diagnostics for chosen-versus-previous and best-versus-previous actions.
 
 ## Prior-restricted versus full-grid MCTS
 
@@ -204,6 +264,20 @@ MultiAsset root values:
 
 ```text
 {multi_asset_root_summary}
+```
+
+## Root edge diagnostics
+
+SPY-only root edges:
+
+```text
+{spy_edge_summary}
+```
+
+MultiAsset root edges:
+
+```text
+{multi_asset_edge_summary}
 ```
 """
     path.write_text(content, encoding="utf-8")

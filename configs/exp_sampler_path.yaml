@@ -1,0 +1,6 @@
+experiment:
+  name: exp_sampler_path
+  description: MCTS samples contiguous return paths from dates in the same regime.
+
+mcts:
+  sampler: "path"

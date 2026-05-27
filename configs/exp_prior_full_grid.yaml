@@ -1,0 +1,8 @@
+experiment:
+  name: exp_prior_full_grid
+  description: SPY-only MCTS evaluates the full action grid, ignoring prior-band restriction.
+
+mcts:
+  sampler: "path"
+  use_full_action_grid: true
+  prior_band: 0.5

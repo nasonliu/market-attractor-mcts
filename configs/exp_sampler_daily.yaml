@@ -1,0 +1,6 @@
+experiment:
+  name: exp_sampler_daily
+  description: MCTS samples independent one-day returns by regime.
+
+mcts:
+  sampler: "regime_daily"

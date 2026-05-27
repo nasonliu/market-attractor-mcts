@@ -1,0 +1,8 @@
+experiment:
+  name: exp_prior_band_050
+  description: Prior-restricted action grid with prior band 50 percentage points.
+
+mcts:
+  sampler: "path"
+  use_full_action_grid: false
+  prior_band: 0.5

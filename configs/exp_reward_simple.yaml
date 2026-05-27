@@ -1,0 +1,8 @@
+experiment:
+  name: exp_reward_simple
+  description: Reward is return minus transaction cost only.
+
+mcts:
+  sampler: "path"
+  drawdown_penalty: 0.0
+  opportunity_cost_weight: 0.0
