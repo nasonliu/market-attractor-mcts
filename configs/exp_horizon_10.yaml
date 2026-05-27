@@ -1,0 +1,12 @@
+experiment:
+  name: exp_horizon_10
+  description: Increase MCTS rollout horizon from 5 to 10 trading days.
+  hypothesis: MCTS horizon of 5 is too short and may overreact to short-term noise; a 10-day horizon can better capture regime drift and stabilize root action values.
+  changed_variable: mcts.horizon
+  baseline_experiment: benchmark_v1
+  expected_result: SPY-only MCTS Sharpe or Calmar improves versus benchmark_v1 without unacceptable turnover growth.
+  success_criteria: SPY MCTS gate remains WEAK PASS or better and Sharpe or Calmar delta improves versus benchmark_v1.
+
+mcts:
+  sampler: "path"
+  horizon: 10

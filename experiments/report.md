@@ -25,7 +25,7 @@ This is a full-sample exploratory benchmark. It is intentionally not walk-forwar
 ```text
               count
 overall_gate       
-FAIL             12
+FAIL             13
 ```
 
 ## Experiment Comparison Summary
@@ -33,6 +33,7 @@ FAIL             12
 ```text
                  experiment                                                                                                                                                hypothesis                                       changed_variable baseline_experiment                                                                                                          expected_result                                                                                                              success_criteria spy_mcts_gate multi_asset_mcts_gate overall_gate hypothesis_supported         decision          primary_failure_mode                                                               next_recommended_experiment           leakage_level  contract_review_passed  spy_mcts_cagr_delta_vs_buy_hold  spy_mcts_sharpe_delta_vs_buy_hold  spy_mcts_calmar_delta_vs_buy_hold  spy_mcts_max_drawdown_delta_vs_buy_hold  spy_mcts_turnover_delta_vs_buy_hold  spy_mcts_cagr_delta_vs_regime_rule_spy_cash  spy_mcts_sharpe_delta_vs_regime_rule_spy_cash  spy_mcts_calmar_delta_vs_regime_rule_spy_cash  spy_mcts_max_drawdown_delta_vs_regime_rule_spy_cash  spy_mcts_turnover_delta_vs_regime_rule_spy_cash  spy_mcts_cagr_delta_vs_regime_rule_multiasset  spy_mcts_sharpe_delta_vs_regime_rule_multiasset  spy_mcts_calmar_delta_vs_regime_rule_multiasset  spy_mcts_max_drawdown_delta_vs_regime_rule_multiasset  spy_mcts_turnover_delta_vs_regime_rule_multiasset  multi_asset_mcts_cagr_delta_vs_buy_hold  multi_asset_mcts_sharpe_delta_vs_buy_hold  multi_asset_mcts_calmar_delta_vs_buy_hold  multi_asset_mcts_max_drawdown_delta_vs_buy_hold  multi_asset_mcts_turnover_delta_vs_buy_hold  multi_asset_mcts_cagr_delta_vs_regime_rule_spy_cash  multi_asset_mcts_sharpe_delta_vs_regime_rule_spy_cash  multi_asset_mcts_calmar_delta_vs_regime_rule_spy_cash  multi_asset_mcts_max_drawdown_delta_vs_regime_rule_spy_cash  multi_asset_mcts_turnover_delta_vs_regime_rule_spy_cash  multi_asset_mcts_cagr_delta_vs_regime_rule_multiasset  multi_asset_mcts_sharpe_delta_vs_regime_rule_multiasset  multi_asset_mcts_calmar_delta_vs_regime_rule_multiasset  multi_asset_mcts_max_drawdown_delta_vs_regime_rule_multiasset  multi_asset_mcts_turnover_delta_vs_regime_rule_multiasset
                benchmark_v1                                                                      Baseline settings provide the reference for all exploratory full-sample experiments.                                                   none        benchmark_v1                                                             Establish stable benchmark metrics and diagnostic artifacts.                                                                     MCTS is at least a WEAK PASS versus Regime Rule SPY/Cash.     WEAK PASS                  FAIL         FAIL         inconclusive KEEP_EXPLORATORY multi_asset_turnover_too_high Test MultiAsset template persistence or turnover damping in a single-variable experiment. exploratory_full_sample                    True                        -0.075831                          -0.210311                          -0.167130                                 0.076417                             0.202534                                    -0.009657                                       0.025269                                      -0.013908                                             0.022434                                         0.167131                                      -0.071020                                        -0.239072                                        -0.230592                                               0.022434                                           0.131244                                -0.075489                                  -0.280265                                  -0.201540                                         0.034172                                     0.757032                                            -0.009315                                              -0.044685                                              -0.048318                                                    -0.019810                                                 0.721629                                              -0.070678                                                -0.309026                                                -0.265002                                                      -0.019810                                                   0.685742
+             exp_horizon_10  MCTS horizon of 5 is too short and may overreact to short-term noise; a 10-day horizon can better capture regime drift and stabilize root action values.                                           mcts.horizon        benchmark_v1                        SPY-only MCTS Sharpe or Calmar improves versus benchmark_v1 without unacceptable turnover growth.                            SPY MCTS gate remains WEAK PASS or better and Sharpe or Calmar delta improves versus benchmark_v1.     WEAK PASS                  FAIL         FAIL                 True KEEP_EXPLORATORY multi_asset_turnover_too_high Test MultiAsset template persistence or turnover damping in a single-variable experiment. exploratory_full_sample                    True                        -0.060477                          -0.083879                          -0.056194                                 0.113519                             0.204898                                     0.005696                                       0.151701                                       0.097028                                             0.059537                                         0.169496                                      -0.055666                                        -0.112640                                        -0.119655                                               0.059537                                           0.133608                                -0.103364                                  -0.488690                                  -0.262960                                         0.092414                                     0.767095                                            -0.037190                                              -0.253110                                              -0.109738                                                     0.038431                                                 0.731693                                              -0.098553                                                -0.517451                                                -0.326421                                                       0.038431                                                   0.695805
             exp_inertia_001                MCTS turnover is too high; a stronger action inertia threshold can reduce small value-edge switches and improve risk-adjusted performance.                          mcts.action_inertia_threshold        benchmark_v1                                  SPY-only MCTS turnover decreases versus benchmark_v1 without lowering Sharpe or Calmar. SPY MCTS gate remains WEAK PASS or better, turnover decreases, and Sharpe or Calmar does not deteriorate versus benchmark_v1.     WEAK PASS                  FAIL         FAIL                 True KEEP_EXPLORATORY multi_asset_turnover_too_high Test MultiAsset template persistence or turnover damping in a single-variable experiment. exploratory_full_sample                    True                        -0.065287                          -0.138735                          -0.137848                                 0.066183                             0.189258                                     0.000886                                       0.096845                                       0.015374                                             0.012201                                         0.153855                                      -0.060476                                        -0.167496                                        -0.201309                                               0.012201                                           0.117968                                -0.075489                                  -0.280265                                  -0.201540                                         0.034172                                     0.757032                                            -0.009315                                              -0.044685                                              -0.048318                                                    -0.019810                                                 0.721629                                              -0.070678                                                -0.309026                                                -0.265002                                                      -0.019810                                                   0.685742
             exp_inertia_002                MCTS turnover is too high; a stronger action inertia threshold can reduce small value-edge switches and improve risk-adjusted performance.                          mcts.action_inertia_threshold        benchmark_v1                                  SPY-only MCTS turnover decreases versus benchmark_v1 without lowering Sharpe or Calmar. SPY MCTS gate remains WEAK PASS or better, turnover decreases, and Sharpe or Calmar does not deteriorate versus benchmark_v1.     WEAK PASS                  FAIL         FAIL                 True KEEP_EXPLORATORY multi_asset_turnover_too_high Test MultiAsset template persistence or turnover damping in a single-variable experiment. exploratory_full_sample                    True                        -0.077562                          -0.223364                          -0.078881                                 0.148521                             0.163191                                    -0.011389                                       0.012216                                       0.074341                                             0.094539                                         0.127789                                      -0.072751                                        -0.252125                                        -0.142342                                               0.094539                                           0.091901                                -0.075489                                  -0.280265                                  -0.201540                                         0.034172                                     0.757032                                            -0.009315                                              -0.044685                                              -0.048318                                                    -0.019810                                                 0.721629                                              -0.070678                                                -0.309026                                                -0.265002                                                      -0.019810                                                   0.685742
          exp_prior_band_025                                                                              A tighter prior band reduces turnover but may over-constrain SPY allocation.                                        mcts.prior_band        benchmark_v1                                                    Turnover decreases relative to benchmark_v1 with limited Sharpe loss.                                                      SPY MCTS turnover delta improves while gate remains WEAK PASS or better.     WEAK PASS                  FAIL         FAIL                 True KEEP_EXPLORATORY multi_asset_turnover_too_high Test MultiAsset template persistence or turnover damping in a single-variable experiment. exploratory_full_sample                    True                        -0.075831                          -0.210311                          -0.167130                                 0.076417                             0.202534                                    -0.009657                                       0.025269                                      -0.013908                                             0.022434                                         0.167131                                      -0.071020                                        -0.239072                                        -0.230592                                               0.022434                                           0.131244                                -0.075489                                  -0.280265                                  -0.201540                                         0.034172                                     0.757032                                            -0.009315                                              -0.044685                                              -0.048318                                                    -0.019810                                                 0.721629                                              -0.070678                                                -0.309026                                                -0.265002                                                      -0.019810                                                   0.685742
@@ -49,76 +50,76 @@ exp_reward_low_risk_penalty The benchmark reward is too conservative; lowering b
 ## Best by Sharpe
 
 ```text
-         experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
- exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-exp_prior_full_grid Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
- exp_prior_band_025 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-  exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-  exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
- exp_prior_band_050 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-   exp_sampler_path Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+                 experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
+         exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+             exp_horizon_10 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+         exp_prior_band_025 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+          exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+exp_reward_low_risk_penalty Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+          exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+         exp_prior_band_050 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
 ```
 
 ## Best by Calmar
 
 ```text
-         experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
- exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-exp_prior_full_grid Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
- exp_prior_band_025 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-  exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-  exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-    exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
- exp_prior_band_050 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-   exp_sampler_path Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+                 experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
+         exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+             exp_horizon_10 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+            exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+         exp_prior_band_025 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+          exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+exp_reward_low_risk_penalty Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+          exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+         exp_prior_band_050 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
 ```
 
 ## Best by Max Drawdown
 
 ```text
-                 experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
-          exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-exp_reward_low_risk_penalty Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-           exp_sampler_path Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-         exp_prior_band_050 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-            exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-         exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-            exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-        exp_prior_full_grid Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-            exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
-          exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+         experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
+    exp_reward_risk Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+     exp_horizon_10 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+ exp_prior_band_025 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+  exp_sampler_daily Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+    exp_inertia_002 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+   exp_sampler_path Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+ exp_prior_band_100 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+  exp_reward_simple Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+exp_prior_full_grid Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
+    exp_inertia_001 Vol Target         FAIL       3.64277 0.098209 0.973869 0.766667     -0.128099            0.017483
 ```
 
 ## Lowest Turnover
 
 ```text
-                 experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
-               benchmark_v1 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-           exp_sampler_path Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-         exp_prior_band_100 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-         exp_prior_band_025 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-        exp_prior_full_grid Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-exp_reward_low_risk_penalty Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-            exp_reward_risk Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-            exp_inertia_002 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-         exp_prior_band_050 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
-          exp_reward_simple Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+         experiment   strategy overall_gate  total_return     cagr   sharpe   calmar  max_drawdown  avg_daily_turnover
+       benchmark_v1 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+exp_prior_full_grid Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+    exp_reward_risk Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+ exp_prior_band_100 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+ exp_prior_band_050 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+  exp_reward_simple Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+  exp_sampler_daily Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+    exp_inertia_002 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+    exp_inertia_001 Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
+   exp_sampler_path Buy & Hold         FAIL      7.849912 0.142299 0.863989 0.422035     -0.337173            0.000242
 ```
 
 ## Best SPY-only MCTS Experiment
 
 ```text
         experiment spy_mcts_gate  total_return     cagr   sharpe  max_drawdown  avg_daily_turnover  spy_mcts_cagr_delta_vs_regime_rule_spy_cash  spy_mcts_sharpe_delta_vs_regime_rule_spy_cash  spy_mcts_max_drawdown_delta_vs_regime_rule_spy_cash  spy_mcts_turnover_delta_vs_regime_rule_spy_cash
+    exp_horizon_10     WEAK PASS      2.628866 0.081822 0.780111     -0.223654            0.205141                                     0.005696                                       0.151701                                             0.059537                                         0.169496
    exp_inertia_001     WEAK PASS      2.373293 0.077012 0.725254     -0.270990            0.189500                                     0.000886                                       0.096845                                             0.012201                                         0.153855
  exp_reward_simple     WEAK PASS      2.323296 0.076031 0.718259     -0.314583            0.197199                                    -0.000094                                       0.089849                                            -0.031393                                         0.161554
       benchmark_v1     WEAK PASS      1.870984 0.066468 0.653679     -0.260756            0.202776                                    -0.009657                                       0.025269                                             0.022434                                         0.167131
 exp_prior_band_025     WEAK PASS      1.870984 0.066468 0.653679     -0.260756            0.202776                                    -0.009657                                       0.025269                                             0.022434                                         0.167131
-exp_prior_band_050     WEAK PASS      1.870984 0.066468 0.653679     -0.260756            0.202776                                    -0.009657                                       0.025269                                             0.022434                                         0.167131
 ```
 
 ## Best MultiAsset MCTS Experiment
@@ -135,12 +136,12 @@ exp_reward_low_risk_penalty                  FAIL      2.810851 0.085057 0.72281
 ## Best by SPY MCTS Calmar Delta
 
 ```text
-        experiment spy_mcts_gate     cagr   sharpe   calmar  max_drawdown  spy_mcts_calmar_delta_vs_regime_rule_spy_cash
-   exp_inertia_002     WEAK PASS 0.064737 0.640625 0.343154     -0.188652                                       0.074341
- exp_sampler_daily     WEAK PASS 0.065304 0.642349 0.301572     -0.216544                                       0.032759
-   exp_inertia_001     WEAK PASS 0.077012 0.725254 0.284187     -0.270990                                       0.015374
-      benchmark_v1     WEAK PASS 0.066468 0.653679 0.254905     -0.260756                                      -0.013908
-exp_prior_band_025     WEAK PASS 0.066468 0.653679 0.254905     -0.260756                                      -0.013908
+       experiment spy_mcts_gate     cagr   sharpe   calmar  max_drawdown  spy_mcts_calmar_delta_vs_regime_rule_spy_cash
+   exp_horizon_10     WEAK PASS 0.081822 0.780111 0.365842     -0.223654                                       0.097028
+  exp_inertia_002     WEAK PASS 0.064737 0.640625 0.343154     -0.188652                                       0.074341
+exp_sampler_daily     WEAK PASS 0.065304 0.642349 0.301572     -0.216544                                       0.032759
+  exp_inertia_001     WEAK PASS 0.077012 0.725254 0.284187     -0.270990                                       0.015374
+     benchmark_v1     WEAK PASS 0.066468 0.653679 0.254905     -0.260756                                      -0.013908
 ```
 
 ## Best by MultiAsset MCTS Calmar Delta
@@ -177,7 +178,7 @@ exp_reward_low_risk_penalty   REJECT                False multi_asset_turnover_t
 
 ## Recommended Next Experiments
 
-- Promote or retest the strongest SPY-only candidate: exp_inertia_001 (WEAK PASS).
+- Promote or retest the strongest SPY-only candidate: exp_horizon_10 (WEAK PASS).
 - Use multi-asset results as diagnostics until a candidate improves versus Regime Rule: current best is exp_reward_low_risk_penalty (FAIL).
 - Investigate FAIL experiments before expanding the matrix.
 - Keep walk-forward validation out of this benchmark until full-sample experiments stabilize.
