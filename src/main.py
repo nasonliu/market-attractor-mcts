@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+import argparse
+
+import pandas as pd
+
+from src.backtest import run_backtest, summarize_metrics
+from src.config import DATA_DIR, OUTPUT_DIR, PLOTS_DIR, REPORTS_DIR, ensure_directories, load_config
+from src.data import download_prices
+from src.diagnostics import (
+    mcts_regime_position_stats,
+    strategy_position_diagnostics,
+    write_diagnostics_markdown,
+)
+from src.features import build_features
+from src.mcts import build_mcts_weights
+from src.plots import plot_drawdowns, plot_equity_curves, plot_mcts_position
+from src.regime import compute_regime_summary, identify_regimes
+from src.strategies import buy_and_hold, ma200_trend, regime_rule, vol_target
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run Market Attractor Guided MCTS research pipeline.")
+    parser.add_argument("--config", default=None, help="Path to config.yaml")
+    parser.add_argument("--force-download", action="store_true", help="Re-download yfinance data")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    ensure_directories()
+    config = load_config(args.config)
+
+    prices = download_prices(config, DATA_DIR, force=args.force_download)
+    prices.to_csv(DATA_DIR / "prices.csv")
+
+    features = build_features(prices, config)
+    features.to_csv(OUTPUT_DIR / "features.csv")
+
+    regimes, _ = identify_regimes(features, config)
+    regimes.to_csv(OUTPUT_DIR / "regime_labels.csv")
+
+    trading_days = int(config["backtest"]["trading_days"])
+    regime_summary = compute_regime_summary(prices, regimes, trading_days=trading_days)
+    regime_summary.to_csv(OUTPUT_DIR / "regime_summary.csv", index=False)
+
+    buy_hold_weights = buy_and_hold(prices)
+    ma200_weights = ma200_trend(prices, window=int(config["backtest"]["ma_window"]))
+    vol_target_weights = vol_target(
+        prices,
+        target_vol_annual=float(config["backtest"]["vol_target_annual"]),
+        max_leverage=float(config["backtest"]["max_leverage"]),
+    )
+    regime_rule_weights = regime_rule(
+        prices,
+        regimes,
+        safe_assets=list(config["backtest"]["regime_rule_safe_assets"]),
+        method="hmm_regime",
+    )
+    mcts_weights = build_mcts_weights(
+        prices,
+        regimes,
+        config,
+        method="hmm_regime",
+        prior_weights=regime_rule_weights,
+    )
+
+    strategy_weights = {
+        "Buy & Hold": buy_hold_weights,
+        "MA200 Trend": ma200_weights,
+        "Vol Target": vol_target_weights,
+        "Regime Rule": regime_rule_weights,
+        "Market Attractor MCTS": mcts_weights,
+    }
+
+    metrics_rows = []
+    equity_curves = pd.DataFrame(index=prices.index)
+    drawdowns = pd.DataFrame(index=prices.index)
+
+    for name, weights in strategy_weights.items():
+        cost_bps = (
+            float(config["mcts"]["transaction_cost_bps"])
+            if name == "Market Attractor MCTS"
+            else float(config["backtest"]["transaction_cost_bps"])
+        )
+        result = run_backtest(
+            prices,
+            weights,
+            transaction_cost_bps=cost_bps,
+            initial_capital=float(config["backtest"]["initial_capital"]),
+        )
+        equity_curves[name] = result["equity"]
+        drawdowns[name] = result["drawdown"]
+        metrics_rows.append(
+            summarize_metrics(
+                strategy_name=name,
+                returns=result["returns"],
+                equity=result["equity"],
+                drawdown=result["drawdown"],
+                turnover=result["turnover"],
+                trading_days=trading_days,
+            )
+        )
+
+    metrics = pd.DataFrame(metrics_rows)
+    metrics.to_csv(OUTPUT_DIR / "metrics.csv", index=False)
+    equity_curves.to_csv(OUTPUT_DIR / "equity_curve.csv")
+    drawdowns.to_csv(OUTPUT_DIR / "drawdown.csv")
+
+    plot_equity_curves(equity_curves, PLOTS_DIR)
+    plot_drawdowns(drawdowns, PLOTS_DIR)
+
+    asset = str(config["mcts"]["asset"])
+    mcts_position = pd.DataFrame(
+        {
+            "mcts_position": mcts_weights[asset].reindex(prices.index).ffill().fillna(0.0),
+            "regime_rule_prior": regime_rule_weights[asset].reindex(prices.index).ffill().fillna(0.0),
+        },
+        index=prices.index,
+    )
+    mcts_position.to_csv(REPORTS_DIR / "mcts_position.csv")
+    plot_mcts_position(mcts_position["mcts_position"], REPORTS_DIR)
+
+    strategy_diagnostics = strategy_position_diagnostics(
+        strategy_weights,
+        asset=asset,
+        trading_days=trading_days,
+    )
+    strategy_diagnostics.to_csv(REPORTS_DIR / "strategy_diagnostics.csv", index=False)
+
+    mcts_regime_stats = mcts_regime_position_stats(
+        prices,
+        regimes,
+        mcts_weights,
+        regime_rule_weights,
+        asset=asset,
+        method="hmm_regime",
+    )
+    mcts_regime_stats.to_csv(REPORTS_DIR / "mcts_regime_stats.csv", index=False)
+    write_diagnostics_markdown(
+        REPORTS_DIR / "diagnostics.md",
+        metrics,
+        strategy_diagnostics,
+        mcts_regime_stats,
+    )
+
+    print(f"Wrote outputs to {OUTPUT_DIR}")
+    print(f"Wrote reports to {REPORTS_DIR}")
+    print(metrics.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()
